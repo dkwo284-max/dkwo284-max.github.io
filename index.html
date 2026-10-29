@@ -55,6 +55,7 @@ h1 { margin: 0; font-size: 1.4rem; }
 .usage small { display: block; color: var(--muted); margin-top: 6px; }
 .ai { font-size: .78rem; color: var(--muted); }
 .app > :not(img):not(.ph) { grid-column: 2; }
+.hello { color: var(--muted); font-size: .95rem; padding: 24px 0; }
 .app.soon { box-shadow: none; background: transparent; border-style: dashed; cursor: default; }
 footer { margin-top: 28px; color: var(--muted); font-size: .8rem; }
 footer a { color: var(--accent); }
@@ -66,7 +67,8 @@ footer a { color: var(--accent); }
   <p class="today" id="today"></p>
   <section class="usage" id="usage" hidden></section>
   <main class="apps" id="apps"></main>
-  <footer>
+  <p class="hello" id="hello" hidden>개인 앱 모음 페이지입니다.</p>
+  <footer id="foot" hidden>
     모든 앱은 GitHub Actions 가 정해진 시각에 데이터를 만들고 GitHub Pages 로 배포합니다. 홈 화면에 추가하면 앱처럼 열려요.
   </footer>
 </div>
@@ -93,7 +95,27 @@ const rel = (iso) => {
 
 document.getElementById("today").textContent = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
 
+// 개발자 모드: 주소 뒤에 #dev=암호 를 붙여 한 번 열면 이 기기에 기억. 암호는 해시(SHA-256)로만 코드에 있음. 해제: #dev=off
+// 주의: 카드를 숨기는 것일 뿐 앱 주소 자체는 공개입니다(주소를 아는 사람은 열 수 있음).
+const DEV_HASH = "dd27ffaa9faf159b526e3827bae7e1ca2129d04c336b9644a292e506fd49d16f";
+async function sha256(t) {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+async function devMode() {
+  const m = location.hash.match(/^#dev=(.*)$/);
+  if (m) {
+    history.replaceState(null, "", location.pathname + location.search);
+    try {
+      if (m[1] === "off") localStorage.removeItem("hub.dev");
+      else if (await sha256(decodeURIComponent(m[1])) === DEV_HASH) localStorage.setItem("hub.dev", DEV_HASH);
+    } catch { /* 저장 불가 환경 */ }
+  }
+  try { return localStorage.getItem("hub.dev") === DEV_HASH; } catch { return false; }
+}
+
 const root = document.getElementById("apps");
+function showApps() {
 root.innerHTML = APPS.map((a, i) => `
   <a class="app" href="${esc(a.href)}" id="app-${i}">
     <img src="${esc(a.icon)}" alt="" width="56" height="56">
@@ -143,6 +165,12 @@ APPS.forEach(async (a, i) => {
     st.textContent = "준비 중"; st.className = "status wait";
     meta.textContent = "아직 데이터가 없어요";
   }
+});
+}
+
+devMode().then((dev) => {
+  if (dev) { showApps(); document.getElementById("foot").hidden = false; }
+  else document.getElementById("hello").hidden = false;
 });
 </script>
 </body>

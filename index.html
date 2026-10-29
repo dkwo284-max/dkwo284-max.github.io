@@ -48,6 +48,13 @@ h1 { margin: 0; font-size: 1.4rem; }
 .status.ok { color: var(--ok); background: var(--ok-bg); }
 .status.wait { color: var(--wait); background: var(--wait-bg); }
 .meta { font-size: .78rem; color: var(--muted); }
+.usage { margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); font-size: .86rem; }
+.usage b { font-size: 1rem; }
+.usage .bar { height: 6px; border-radius: 3px; background: var(--line); margin-top: 8px; overflow: hidden; }
+.usage .bar i { display: block; height: 100%; background: var(--accent); }
+.usage small { display: block; color: var(--muted); margin-top: 6px; }
+.ai { font-size: .78rem; color: var(--muted); }
+.app > :not(img):not(.ph) { grid-column: 2; }
 .app.soon { box-shadow: none; background: transparent; border-style: dashed; cursor: default; }
 footer { margin-top: 28px; color: var(--muted); font-size: .8rem; }
 footer a { color: var(--accent); }
@@ -57,6 +64,7 @@ footer a { color: var(--accent); }
 <div class="wrap">
   <header><img src="icon.svg" alt=""><h1>My Hub</h1></header>
   <p class="today" id="today"></p>
+  <section class="usage" id="usage" hidden></section>
   <main class="apps" id="apps"></main>
   <footer>
     모든 앱은 GitHub Actions 가 정해진 시각에 데이터를 만들고 GitHub Pages 로 배포합니다. 홈 화면에 추가하면 앱처럼 열려요.
@@ -67,10 +75,10 @@ footer a { color: var(--accent); }
 const APPS = [
   { name: "Daily Brief", icon: "brief-192.png", href: "/News_Summary/",
     desc: "오클랜드·뉴질랜드·한국 아침 뉴스 요약, 이민 레이더, 동네·치안 지도",
-    data: "/News_Summary/data/latest.json", time: (d) => d.generated_at },
+    data: "/News_Summary/data/latest.json", time: (d) => d.generated_at, usage: "/News_Summary/data/ai-usage.json" },
   { name: "웨일 레이더", icon: "whale-192.png", href: "/Whale_Radar/",
     desc: "버핏·애크먼 등 거물 투자자의 SEC 공시와 인터뷰·뉴스를 한국어로",
-    data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at) },
+    data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at), usage: "/Whale_Radar/data/ai-usage.json" },
 ];
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -92,12 +100,34 @@ root.innerHTML = APPS.map((a, i) => `
     <h2>${esc(a.name)} <span class="status wait" data-st>확인 중</span></h2>
     <p>${esc(a.desc)}</p>
     <span class="meta" data-meta></span>
+    <span class="ai" data-ai></span>
   </a>`).join("") + `
   <div class="app soon" aria-label="다음 앱 자리">
     <span class="ph" aria-hidden="true">＋</span>
     <h2>다음 앱</h2>
     <p>새 앱을 만들면 여기에 추가돼요.</p>
   </div>`;
+
+// AI(Gemini) 사용량: 각 앱이 남기는 ai-usage.json 의 가장 최근 날짜 기록 (두 앱이 같은 키·같은 무료 한도를 씀)
+const usageTotals = [];
+async function loadUsage(a, i) {
+  if (!a.usage) return;
+  try {
+    const u = await (await fetch(a.usage, { cache: "no-store" })).json();
+    const day = Object.keys(u.days || {}).sort().pop();
+    if (!day) return;
+    const n = u.days[day].requests, runs = u.days[day].runs;
+    document.querySelector(`#app-${i} [data-ai]`).textContent = `AI ${n}/${u.cap}회 · 실행 ${runs}번 (${+day.slice(5, 7)}/${+day.slice(8, 10)})`;
+    usageTotals.push({ name: a.name, n, cap: u.cap });
+    const total = usageTotals.reduce((s, x) => s + x.n, 0), cap = usageTotals.reduce((s, x) => s + x.cap, 0);
+    const box = document.getElementById("usage");
+    box.hidden = false;
+    box.innerHTML = `오늘 Gemini 사용 <b>${total}회</b> / 앱별 상한 합계 ${cap}회
+      <div class="bar" aria-hidden="true"><i style="width:${Math.min(100, total / cap * 100).toFixed(0)}%"></i></div>
+      <small>${usageTotals.map((x) => `${esc(x.name)} ${x.n}`).join(" · ")} · 두 앱이 같은 Gemini 키(같은 무료 한도)를 함께 써요. 앱별 상한을 넘는 재실행은 자동으로 건너뜁니다.</small>`;
+  } catch { /* 사용량 파일이 아직 없음 */ }
+}
+APPS.forEach(loadUsage);
 
 APPS.forEach(async (a, i) => {
   const card = document.getElementById(`app-${i}`);

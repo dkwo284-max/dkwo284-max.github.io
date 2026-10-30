@@ -1,0 +1,11 @@
+{
+  "_설명": "세 앱이 같은 Gemini 키의 하루 몫을 나눠 쓰는 예산표. 하루 = 오클랜드(Pacific/Auckland) 00시 리셋. 숫자만 바꾸면 모든 앱이 다음 실행부터 따릅니다(합계 = 보장량 합 + reserve).",
+  "timezone": "Pacific/Auckland",
+  "total": 16,
+  "reserve": 3,
+  "apps": {
+    "daily-brief":    { "name": "Daily Brief",     "guaranteed": 7, "usage": "/News_Summary/data/ai-usage.json" },
+    "whale-radar":    { "name": "웨일 레이더",     "guaranteed": 3, "usage": "/Whale_Radar/data/ai-usage.json" },
+    "robotics-radar": { "name": "로봇 레이더", "guaranteed": 3, "usage": "/Robotics_Radar/data/ai-usage.json" }
+  }
+}

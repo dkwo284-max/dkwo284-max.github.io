@@ -75,13 +75,13 @@ footer a { color: var(--accent); }
 <script>
 // 앱 목록: 새 앱은 여기에 한 줄 추가. data 는 마지막 업데이트 시각을 읽어 올 파일(같은 github.io 주소라 바로 읽힘)
 const APPS = [
-  { name: "Daily Brief", icon: "brief-192.png", href: "/News_Summary/",
+  { id: "daily-brief", name: "Daily Brief", icon: "brief-192.png", href: "/News_Summary/",
     desc: "오클랜드·뉴질랜드·한국 아침 뉴스 요약, 이민 레이더, 동네·치안 지도",
     data: "/News_Summary/data/latest.json", time: (d) => d.generated_at, usage: "/News_Summary/data/ai-usage.json" },
-  { name: "웨일 레이더", icon: "whale-192.png", href: "/Whale_Radar/",
+  { id: "whale-radar", name: "웨일 레이더", icon: "whale-192.png", href: "/Whale_Radar/",
     desc: "버핏·애크먼 등 거물 투자자의 SEC 공시와 인터뷰·뉴스를 한국어로",
     data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at), usage: "/Whale_Radar/data/ai-usage.json" },
-  { name: "로봇 레이더", icon: "robot-192.png", href: "/Robotics_Radar/",
+  { id: "robotics-radar", name: "로봇 레이더", icon: "robot-192.png", href: "/Robotics_Radar/",
     desc: "휴머노이드·피지컬 AI 기업의 양산·자금·IPO·부품 기회를 부품사·투자 관점으로",
     data: "/Robotics_Radar/data/dashboard.json", time: (d) => d.generated_at, usage: "/Robotics_Radar/data/ai-usage.json" },
 ];
@@ -133,26 +133,36 @@ root.innerHTML = APPS.map((a, i) => `
     <p>새 앱을 만들면 여기에 추가돼요.</p>
   </div>`;
 
-// AI(Gemini) 사용량: 각 앱이 남기는 ai-usage.json 의 가장 최근 날짜 기록 (두 앱이 같은 키·같은 무료 한도를 씀)
-const usageTotals = [];
-async function loadUsage(a, i) {
-  if (!a.usage) return;
-  try {
-    const u = await (await fetch(a.usage, { cache: "no-store" })).json();
-    const day = Object.keys(u.days || {}).sort().pop();
-    if (!day) return;
-    const n = u.days[day].requests, runs = u.days[day].runs;
-    document.querySelector(`#app-${i} [data-ai]`).textContent = `AI ${n}/${u.cap}회 · 실행 ${runs}번 (${+day.slice(5, 7)}/${+day.slice(8, 10)})`;
-    usageTotals.push({ name: a.name, n, cap: u.cap });
-    const total = usageTotals.reduce((s, x) => s + x.n, 0), cap = usageTotals.reduce((s, x) => s + x.cap, 0);
-    const box = document.getElementById("usage");
-    box.hidden = false;
-    box.innerHTML = `오늘 Gemini 사용 <b>${total}회</b> / 앱별 상한 합계 ${cap}회
-      <div class="bar" aria-hidden="true"><i style="width:${Math.min(100, total / cap * 100).toFixed(0)}%"></i></div>
-      <small>${usageTotals.map((x) => `${esc(x.name)} ${x.n}`).join(" · ")} · 앱들이 같은 Gemini 키(같은 무료 한도)를 함께 써요. 앱별 상한을 넘는 재실행은 자동으로 건너뜁니다.</small>`;
-  } catch { /* 사용량 파일이 아직 없음 */ }
+// AI(Gemini) 사용량: 예산표(budget.json)와 각 앱의 ai-usage.json 을 읽어 오늘(오클랜드 00시 기준) 사용량과 공유 예비분을 보여줌.
+// 세 앱이 같은 Gemini 키를 나눠 쓰며, 각 앱은 자기 보장량 + 공유 예비분 안에서만 요청합니다.
+const nzToday = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Pacific/Auckland" });  // YYYY-MM-DD
+async function getJson(url) { try { const r = await fetch(url, { cache: "no-store" }); return r.ok ? await r.json() : null; } catch { return null; } }
+async function loadUsage() {
+  const budget = await getJson("/budget.json");
+  const day = nzToday();
+  const rows = await Promise.all(APPS.map(async (a) => {
+    const u = a.usage ? await getJson(a.usage) : null;
+    const g = budget?.apps?.[a.id]?.guaranteed ?? u?.cap ?? 0;
+    const d = u?.days?.[day];
+    return { a, known: !!u, n: d?.requests ?? 0, runs: d?.runs ?? 0, g };
+  }));
+  rows.forEach(({ a, known, n, runs, g }) => {
+    const i = APPS.indexOf(a), el = document.querySelector(`#app-${i} [data-ai]`);
+    if (el && known) el.textContent = `AI 오늘 ${n}/${g}회${n > g ? " (예비분 사용)" : ""} · 실행 ${runs}번`;
+  });
+  const known = rows.filter((r) => r.known);
+  if (!known.length) return;
+  const total = known.reduce((s, r) => s + r.n, 0);
+  const reserveUsed = known.reduce((s, r) => s + Math.max(0, r.n - r.g), 0);
+  const cap = budget?.total ?? known.reduce((s, r) => s + r.g, 0);
+  const reserve = budget?.reserve ?? 0;
+  const box = document.getElementById("usage");
+  box.hidden = false;
+  box.innerHTML = `오늘 Gemini 사용 <b>${total}회</b> / 하루 예산 ${cap}회${reserve ? ` · 공유 예비분 ${Math.min(reserveUsed, reserve)}/${reserve}회 사용` : ""}
+    <div class="bar" aria-hidden="true"><i style="width:${Math.min(100, cap ? total / cap * 100 : 0).toFixed(0)}%"></i></div>
+    <small>${known.map((r) => `${esc(r.a.name)} ${r.n}/${r.g}`).join(" · ")} · 세 앱이 같은 Gemini 키를 나눠 써요. 하루는 오클랜드 00시에 새로 시작하고, 앱마다 보장량은 서로 뺏지 못합니다.</small>`;
 }
-APPS.forEach(loadUsage);
+loadUsage();
 
 APPS.forEach(async (a, i) => {
   const card = document.getElementById(`app-${i}`);

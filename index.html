@@ -57,6 +57,13 @@ h1 { margin: 0; font-size: 1.4rem; }
 .app > :not(img):not(.ph) { grid-column: 2; }
 .hello { color: var(--muted); font-size: .95rem; padding: 24px 0; }
 .app.soon { box-shadow: none; background: transparent; border-style: dashed; cursor: default; }
+.today3 { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--line, #e5e7eb); border-radius: 14px; }
+.today3 h2 { margin: 0 0 6px; font-size: 1rem; }
+.today3 a { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line, #e5e7eb); color: inherit; text-decoration: none; }
+.today3 a:first-of-type { border-top: 0; }
+.today3 img { width: 28px; height: 28px; border-radius: 7px; }
+.today3 b { display: block; font-size: .92rem; line-height: 1.35; }
+.today3 small { display: block; color: var(--muted); font-size: .76rem; margin-top: 1px; }
 footer { margin-top: 28px; color: var(--muted); font-size: .8rem; }
 footer a { color: var(--accent); }
 </style>
@@ -66,6 +73,7 @@ footer a { color: var(--accent); }
   <header><img src="icon.svg" alt=""><h1>My Hub</h1></header>
   <p class="today" id="today"></p>
   <section class="usage" id="usage" hidden></section>
+  <section class="today3" id="today3" hidden aria-label="오늘 볼 것"></section>
   <main class="apps" id="apps"></main>
   <p class="hello" id="hello" hidden>개인 앱 모음 페이지입니다.</p>
   <footer id="foot" hidden>
@@ -77,13 +85,36 @@ footer a { color: var(--accent); }
 const APPS = [
   { id: "daily-brief", name: "Daily Brief", icon: "brief-192.png", href: "/News_Summary/",
     desc: "오클랜드·뉴질랜드·한국 아침 뉴스 요약, 이민 레이더, 동네·치안 지도",
-    data: "/News_Summary/data/latest.json", time: (d) => d.generated_at, usage: "/News_Summary/data/ai-usage.json" },
+    data: "/News_Summary/data/latest.json", time: (d) => d.generated_at, usage: "/News_Summary/data/ai-usage.json",
+    today: { url: "/News_Summary/data/latest.json", text: (d) => {
+      const all = Object.entries(d.sections || {}).filter(([k]) => k !== "kr_politics").flatMap(([, s]) => s.items || []).filter((i) => !i.carried_from);
+      const sc = (i) => (i.importance || 0) * 10 + ({ high: 18, medium: 6 }[i.impact?.level] || 0);
+      const top = all.sort((a, b) => sc(b) - sc(a))[0];
+      if (!top) return null;
+      const high = all.filter((i) => i.impact?.level === "high").length, al = (d.meta?.alerts || []).length;
+      return [top.title_ko, `${d.meta?.degraded ? "⚠️ 오늘 요약 일부 실패 · " : ""}${top.impact?.actions?.[0] ? "👉 " + top.impact.actions[0] + " · " : ""}영향 큰 소식 ${high}건${al ? ` · 이민 알림 ${al}건` : ""}`];
+    } } },
   { id: "whale-radar", name: "웨일 레이더", icon: "whale-192.png", href: "/Whale_Radar/",
     desc: "버핏·애크먼 등 거물 투자자의 SEC 공시와 인터뷰·뉴스를 한국어로",
-    data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at), usage: "/Whale_Radar/data/ai-usage.json" },
+    data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at), usage: "/Whale_Radar/data/ai-usage.json",
+    today: { url: "/Whale_Radar/data/strategy.json", text: (d) => {
+      const f = d.bases?.follow, pick = d.recommend?.pick;
+      if (!f || !pick) return null;
+      const m = f.strategies[pick].metrics, now = f.now, ch = now.changes?.[pick] || {}, pc = (x) => (x == null ? "—" : (x >= 0 ? "+" : "") + (x * 100).toFixed(1) + "%");
+      const top = (now.portfolios[pick] || []).slice(0, 4).map((h) => h.t).join(" · ");
+      return [`추천 조합: ${d.labels[pick]} (${top})`, `5년 연 ${pc(m.cagr)} · S&P500 ${pc(m.spy_cagr)} · 다음 재조정 ${now.next.slice(5).replace("-", "/")} 무렵${(ch.in || []).length ? ` · 지난 재조정에서 ${ch.in.length}종목 편입` : ""}`];
+    } } },
   { id: "robotics-radar", name: "로봇 레이더", icon: "robot-192.png", href: "/Robotics_Radar/",
     desc: "휴머노이드·피지컬 AI 기업의 양산·자금·IPO·부품 기회를 부품사·투자 관점으로",
-    data: "/Robotics_Radar/data/dashboard.json", time: (d) => d.generated_at, usage: "/Robotics_Radar/data/ai-usage.json" },
+    data: "/Robotics_Radar/data/dashboard.json", time: (d) => d.generated_at, usage: "/Robotics_Radar/data/ai-usage.json",
+    today: { url: "/Robotics_Radar/data/dashboard.json", text: (d) => {
+      const since = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+      const news = (d.news || []).filter((x) => x.date >= since).sort((a, b) => (b.importance || 0) - (a.importance || 0) || (b.n_src || 1) - (a.n_src || 1) || b.date.localeCompare(a.date));
+      if (!news.length) return null;
+      const key = news.filter((x) => x.importance >= 3).length, nm = Object.fromEntries((d.companies || []).map((c) => [c.id, c.name_ko]));
+      const who = (news[0].companies || []).slice(0, 2).map((id) => nm[id]).filter(Boolean).join(", ");
+      return [news[0].title_ko || news[0].title, `${who ? who + " · " : ""}최근 7일 소식 ${news.length}건 · 핵심 ${key}건${(d.alerts || []).length ? ` · 경보 ${d.alerts.length}건` : ""}`];
+    } } },
 ];
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -163,6 +194,18 @@ async function loadUsage() {
     <small>${known.map((r) => `${esc(r.a.name)} ${r.n}/${r.g}`).join(" · ")} · 세 앱이 같은 Gemini 키를 나눠 써요. 하루는 오클랜드 00시에 새로 시작하고, 앱마다 보장량은 서로 뺏지 못합니다.</small>`;
 }
 loadUsage();
+
+// 오늘 볼 것 3줄: 각 앱이 이미 만들어 둔 데이터에서 결론 한 줄씩 (AI 요청 없음)
+(async () => {
+  const lines = await Promise.all(APPS.filter((a) => a.today).map(async (a) => {
+    const d = await getJson(a.today.url);
+    let t = null;
+    try { t = d ? a.today.text(d) : null; } catch { t = null; }
+    return t ? `<a href="${esc(a.href)}"><img src="${esc(a.icon)}" alt=""><span><b>${esc(t[0])}</b><small>${esc(a.name)} · ${esc(t[1])}</small></span></a>` : "";
+  }));
+  const box = document.getElementById("today3");
+  if (lines.some(Boolean)) { box.hidden = false; box.innerHTML = `<h2>오늘 볼 것</h2>${lines.join("")}`; }
+})();
 
 APPS.forEach(async (a, i) => {
   const card = document.getElementById(`app-${i}`);

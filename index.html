@@ -175,11 +175,13 @@ async function loadUsage() {
     const u = a.usage ? await getJson(a.usage) : null;
     const g = budget?.apps?.[a.id]?.guaranteed ?? u?.cap ?? 0;
     const d = u?.days?.[day];
-    return { a, known: !!u, n: d?.requests ?? 0, runs: d?.runs ?? 0, g };
+    return { a, known: !!u, n: d?.requests ?? 0, runs: d?.runs ?? 0, g, by: d?.by || {}, week: Object.entries(u?.days || {}).sort().slice(-7).reduce((s, [, x]) => s + (x.requests || 0), 0) };
   }));
   rows.forEach(({ a, known, n, runs, g }) => {
     const i = APPS.indexOf(a), el = document.querySelector(`#app-${i} [data-ai]`);
-    if (el && known) el.textContent = `AI 오늘 ${n}/${g}회${n > g ? " (예비분 사용)" : ""} · 실행 ${runs}번`;
+    const r = rows.find((x) => x.a === a), KIND = { scheduled: "정기", retry: "복구", manual: "수동", side: "부가" };
+    const by = Object.entries(r.by).filter(([, v]) => v > 0).map(([k, v]) => `${KIND[k] || k} ${v}`).join("·");
+    if (el && known) el.textContent = `AI 오늘 ${n}/${g}회${n > g ? " (예비분 사용)" : ""}${by ? ` [${by}]` : ""} · 실행 ${runs}번 · 7일 ${r.week}회`;
   });
   const known = rows.filter((r) => r.known);
   if (!known.length) return;
@@ -194,6 +196,17 @@ async function loadUsage() {
     <small>${known.map((r) => `${esc(r.a.name)} ${r.n}/${r.g}`).join(" · ")} · 세 앱이 같은 Gemini 키를 나눠 써요. 하루는 오클랜드 00시에 새로 시작하고, 앱마다 보장량은 서로 뺏지 못합니다.</small>`;
 }
 loadUsage();
+
+// 지난 7일 품질 한 줄 (Daily Brief 의 status.json — 요약 실패·자동 복구·기준 미달 기사)
+getJson("/News_Summary/data/status.json").then((st) => {
+  const w = st && st.week, box = document.getElementById("usage");
+  if (!w || !w.days || !box) return;
+  const line = document.createElement("small");
+  line.style.display = "block";
+  line.textContent = `Daily Brief 지난 7일: 요약 실패로 끝난 날 ${w.degraded}/${w.days}일 · 자동 복구 ${w.repaired}일 · 재시도 ${w.retries}회${w.items ? ` · 기준 미달 기사 ${w.bad_items}/${w.items}건` : ""}`;
+  const add = () => { if (box.hidden) return setTimeout(add, 300); box.append(line); };
+  add();
+});
 
 // 오늘 볼 것 3줄: 각 앱이 이미 만들어 둔 데이터에서 결론 한 줄씩 (AI 요청 없음)
 (async () => {

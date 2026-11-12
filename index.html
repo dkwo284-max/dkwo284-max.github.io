@@ -58,6 +58,9 @@ h1 { margin: 0; font-size: 1.4rem; }
 .hello { color: var(--muted); font-size: .95rem; padding: 24px 0; }
 .apps > h2.group { grid-column: 1 / -1; margin: 14px 0 0; font-size: 1rem; }
 .apps > h2.group small { font-weight: 400; font-size: .76rem; color: var(--muted); margin-left: 6px; }
+.status.bad { color: #b42318; background: #fde8e7; }
+@media (prefers-color-scheme: dark) { .status.bad { color: #ffb4ab; background: #4a1c19; } }
+.meta.bad { color: #b42318; }
 .status.priv { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .app.soon { box-shadow: none; background: transparent; border-style: dashed; cursor: default; }
 .today3 { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--line, #e5e7eb); border-radius: 14px; }
@@ -120,7 +123,9 @@ const APPS = [
     } } },
 ];
 
-// 개인 도구: Claude 비공개 페이지(본인 계정으로 로그인해야 열림). 허브가 내용을 읽을 수 없어 갱신 시각 대신 고정 안내를 보여 줍니다.
+// 개인 도구: Claude 비공개 페이지(본인 계정으로 로그인해야 열림). 허브는 페이지 내용을 읽을 수 없어서,
+// 갱신 작업이 끝날 때 이 저장소의 tools-status.json 에 남기는 기록으로 '오늘 갱신됨/안 됨'을 표시합니다.
+// every: "daily"(매일 ready 시각(NZ) 이후 오늘 날짜가 있어야 정상) · "weekly"(7일 이내) · 없음(수동 갱신, 표시 안 함)
 // 새 도구를 만들면 여기에 한 줄 추가. repo 는 소스·수집기가 있는 비공개 저장소(없으면 생략).
 const TOOLS = [
   { id: "planner", name: "뉴질랜드 이주 설계실", icon: "planner-192.png", href: "https://claude.ai/artifact/6qnLL7cfUe3gqYtzavKq7o",
@@ -128,9 +133,9 @@ const TOOLS = [
   { id: "prv", name: "영구영주권 체류 플래너", icon: "prv-192.png", href: "https://claude.ai/artifact/BxteZdapkWvUsvCL7DueRc",
     desc: "주신청자별 PRV 신청 가능일·체류일수·주택/고용 경로 점검, 정책 Q&A", note: "현행 INZ 기준 · 백업 migration-planner/backup" },
   { id: "jobs", name: "오클랜드 채용 레이더", icon: "jobs-192.png", href: "https://claude.ai/artifact/GWkSrPbrmGb6HwGTuSSQhn",
-    desc: "오클랜드 채용 공고, 영주권 적격 TOP5, 지원 현황, CV·면접 준비", note: "공고 수집 매일 04:07 · 소스 Job-Radar" },
-  { id: "travel", name: "오클랜드 여행 레이더", icon: "travel-192.png", href: "https://claude.ai/code/artifact/63142437-fd7b-4956-92dd-71cb80be7100",
-    desc: "인천 직항·세계 최저가 항공권, 오클랜드 출항 크루즈, F1 일정", note: "매주 금요일 갱신" },
+    desc: "오클랜드 채용 공고, 영주권 적격 TOP5, 지원 현황, CV·면접 준비", note: "매일 05:30 갱신 · 소스 Job-Radar", every: "daily", ready: "06:30" },
+  { id: "travel", name: "오클랜드 여행 레이더", icon: "travel-192.png", href: "https://claude.ai/artifact/DEcPVo14CSW9wa92RdCB75",
+    desc: "인천 직항·세계 최저가 항공권, 오클랜드 출항 크루즈, F1 일정", note: "매주 금요일 갱신", every: "weekly" },
 ];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const rel = (iso) => {
@@ -174,11 +179,11 @@ root.innerHTML = APPS.map((a, i) => `
     <span class="ai" data-ai></span>
   </a>`).join("") + `
   <h2 class="group">🔒 개인 도구 <small>Claude 비공개 · 본인 계정으로 열림</small></h2>` + TOOLS.map((t) => `
-  <a class="app tool" href="${esc(t.href)}" target="_blank" rel="noopener">
+  <a class="app tool" href="${esc(t.href)}" target="_blank" rel="noopener" id="tool-${esc(t.id)}">
     <img src="${esc(t.icon)}" alt="" width="56" height="56">
-    <h2>${esc(t.name)} <span class="status priv">비공개</span></h2>
+    <h2>${esc(t.name)} <span class="status priv">비공개</span>${t.every ? ' <span class="status wait" data-st>확인 중</span>' : ""}</h2>
     <p>${esc(t.desc)}</p>
-    <span class="meta">${esc(t.note)}</span>
+    <span class="meta" data-meta>${esc(t.note)}</span>
   </a>`).join("") + `
   <div class="app soon" aria-label="다음 앱 자리">
     <span class="ph" aria-hidden="true">＋</span>
@@ -240,6 +245,33 @@ getJson("/News_Summary/data/status.json").then((st) => {
   }));
   const box = document.getElementById("today3");
   if (lines.some(Boolean)) { box.hidden = false; box.innerHTML = `<h2>오늘 볼 것</h2>${lines.join("")}`; }
+})();
+
+// 개인 도구 갱신 상태 (tools-status.json: { "<id>": { "updated": "YYYY-MM-DD"(NZ), "at": "HH:MM", "ok": true/false, "note": "..." } })
+(async () => {
+  const st = await getJson("/tools-status.json");
+  const day = nzToday();
+  const nowHM = new Date().toLocaleTimeString("en-GB", { timeZone: "Pacific/Auckland", hour: "2-digit", minute: "2-digit", hour12: false });
+  const md = (d) => d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : "";
+  const ago = (d) => Math.round((Date.parse(day) - Date.parse(d)) / 864e5);
+  for (const t of TOOLS.filter((x) => x.every)) {
+    const card = document.getElementById(`tool-${t.id}`);
+    if (!card) continue;
+    const badge = card.querySelector("[data-st]"), meta = card.querySelector("[data-meta]");
+    const r = st?.[t.id];
+    const set = (cls, text, m, bad) => { badge.className = `status ${cls}`; badge.textContent = text; meta.textContent = m; meta.classList.toggle("bad", !!bad); };
+    if (!r?.updated) { set("wait", "상태 미확인", `${t.note} · 갱신 기록 없음`); continue; }
+    const last = `마지막 갱신 ${md(r.updated)}${r.at ? " " + r.at : ""}`;
+    const extra = r.note ? ` · ${r.note}` : "";
+    if (t.every === "daily") {
+      if (r.updated === day) set(r.ok === false ? "wait" : "ok", r.ok === false ? "오늘 부분 갱신" : "오늘 갱신됨", `${last}${extra}`, r.ok === false);
+      else if (ago(r.updated) === 1 && nowHM < (t.ready || "07:00")) set("wait", "갱신 대기", `오늘 ${t.ready || "07:00"} 전 갱신 예정 · ${last}`);
+      else set("bad", "오늘 갱신 안 됨", `${last}${extra}`, true);
+    } else {
+      if (ago(r.updated) <= 7) set(r.ok === false ? "wait" : "ok", r.ok === false ? "부분 갱신" : "최신", `${last}${extra}`, r.ok === false);
+      else set("bad", "갱신 안 됨", `${last} (${ago(r.updated)}일 전)`, true);
+    }
+  }
 })();
 
 APPS.forEach(async (a, i) => {

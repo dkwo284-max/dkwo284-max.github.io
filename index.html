@@ -82,6 +82,8 @@ footer a { color: var(--accent); }
 </div>
 <script>
 // 앱 목록: 새 앱은 여기에 한 줄 추가. data 는 마지막 업데이트 시각을 읽어 올 파일(같은 github.io 주소라 바로 읽힘)
+// 이주 설계실 배포 주소(Cloudflare). 아직 모르면 저장소 페이지로 연결됩니다 — 주소를 알게 되면 이 한 줄만 바꾸세요.
+const PLANNER_URL = "https://github.com/dkwo284-max/NZ-Immigration";
 const APPS = [
   { id: "daily-brief", name: "Daily Brief", icon: "brief-192.png", href: "/News_Summary/",
     desc: "오클랜드·뉴질랜드·한국 아침 뉴스 요약, 이민 레이더, 동네·치안 지도",
@@ -115,6 +117,11 @@ const APPS = [
       const who = (news[0].companies || []).slice(0, 2).map((id) => nm[id]).filter(Boolean).join(", ");
       return [news[0].title_ko || news[0].title, `${who ? who + " · " : ""}최근 7일 소식 ${news.length}건 · 핵심 ${key}건${(d.alerts || []).length ? ` · 경보 ${d.alerts.length}건` : ""}`];
     } } },
+  // 뉴질랜드 이주 설계실: Cloudflare Workers 정적 사이트(서버·AI 없음). 아래 href 를 배포 주소(https://nz-migration-planner.<계정>.workers.dev)로 바꾸면 카드가 그 주소로 열립니다.
+  // 주소가 정해지기 전에는 저장소 페이지로 연결. 상태(업데이트 시각)는 GitHub 의 마지막 커밋 시각을 읽습니다(배포 주소의 데이터 파일은 다른 도메인이라 읽을 수 없음).
+  { id: "nz-planner", name: "이주 설계실", icon: "planner-192.png", href: PLANNER_URL,
+    desc: "오클랜드 학군·학교(EQI·NCEA) 분석, 이주 경로 추천, 기간·비용 시뮬레이션",
+    data: "https://api.github.com/repos/dkwo284-max/NZ-Immigration/commits/main", time: (d) => d.commit && d.commit.committer && d.commit.committer.date, noAi: true },
 ];
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

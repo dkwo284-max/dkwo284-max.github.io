@@ -117,6 +117,15 @@ const APPS = [
       const m = f.strategies[pick].metrics, now = f.now, ch = now.changes?.[pick] || {}, pc = (x) => (x == null ? "—" : (x >= 0 ? "+" : "") + (x * 100).toFixed(1) + "%");
       const top = (now.portfolios[pick] || []).slice(0, 4).map((h) => h.t).join(" · ");
       return [`추천 조합: ${d.labels[pick]} (${top})`, `5년 연 ${pc(m.cagr)} · S&P500 ${pc(m.spy_cagr)} · 다음 재조정 ${now.next.slice(5).replace("-", "/")} 무렵${(ch.in || []).length ? ` · 지난 재조정에서 ${ch.in.length}종목 편입` : ""}`];
+    } },
+    // 대가들이 새로 편입한 종목 조합의 실제 성적(추적 시작일부터) — 웨일 레이더 '신규 편입' 화면과 같은 값
+    today2: { url: "/Whale_Radar/data/strategy.json", text: (d) => {
+      const nb = d.newbuys, lv = nb?.live, combo = nb?.now?.combo || [];
+      if (!combo.length) return null;
+      const pc = (x) => (x == null ? "—" : (x >= 0 ? "+" : "") + (x * 100).toFixed(1) + "%");
+      const q = nb.now.period ? `${nb.now.period.slice(0, 4)}년 ${Math.ceil(+nb.now.period.slice(5, 7) / 3)}분기 공시` : "최근 공시";
+      return [`신규 편입 추천 ${combo.length}종목: ${combo.slice(0, 4).join(" · ")}${combo.length > 4 ? " 외" : ""}`,
+        lv ? `${q} 기준 · 추적 ${lv.days}일째 ${pc(lv.ret_net ?? lv.ret)} (S&P500 ${pc(lv.spy)})` : `${q} 기준 · 성적 추적 준비 중`];
     } } },
   { id: "robotics-radar", name: "로봇 레이더", icon: "robot-192.png", href: "/Robotics_Radar/",
     desc: "휴머노이드·피지컬 AI 기업의 양산·자금·IPO·부품 기회를 부품사·투자 관점으로",
@@ -246,10 +255,10 @@ getJson("/News_Summary/data/status.json").then((st) => {
 
 // 오늘 볼 것 3줄: 각 앱이 이미 만들어 둔 데이터에서 결론 한 줄씩 (AI 요청 없음)
 (async () => {
-  const lines = await Promise.all(APPS.filter((a) => a.today).map(async (a) => {
-    const d = await getJson(a.today.url);
+  const lines = await Promise.all(APPS.flatMap((a) => [a.today, a.today2].filter(Boolean).map((td) => ({ a, td }))).map(async ({ a, td }) => {
+    const d = await getJson(td.url);
     let t = null;
-    try { t = d ? a.today.text(d) : null; } catch { t = null; }
+    try { t = d ? td.text(d) : null; } catch { t = null; }
     return t ? `<a href="${esc(a.href)}"><img src="${esc(a.icon)}" alt=""><span><b>${esc(t[0])}</b><small>${esc(a.name)} · ${esc(t[1])}</small></span></a>` : "";
   }));
   const box = document.getElementById("today3");

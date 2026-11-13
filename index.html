@@ -61,6 +61,10 @@ h1 { margin: 0; font-size: 1.4rem; }
 .status.bad { color: #b42318; background: #fde8e7; }
 @media (prefers-color-scheme: dark) { .status.bad { color: #ffb4ab; background: #4a1c19; } }
 .meta.bad { color: #b42318; }
+.alertbar { margin: 0 0 14px; padding: 10px 14px; border-radius: 14px; border: 1px solid #f4b4ae; background: #fde8e7; color: #7a1d14; font-size: .86rem; }
+@media (prefers-color-scheme: dark) { .alertbar { background: #3b1714; border-color: #6b2a24; color: #ffd7d2; } }
+.alertbar b { display: block; margin-bottom: 2px; }
+.alertbar a { color: inherit; }
 .status.priv { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .app.soon { box-shadow: none; background: transparent; border-style: dashed; cursor: default; }
 .today3 { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--line, #e5e7eb); border-radius: 14px; }
@@ -78,6 +82,7 @@ footer a { color: var(--accent); }
 <div class="wrap">
   <header><img src="icon.svg" alt=""><h1>My Hub</h1></header>
   <p class="today" id="today"></p>
+  <section class="alertbar" id="alertbar" hidden role="status"></section>
   <section class="usage" id="usage" hidden></section>
   <section class="today3" id="today3" hidden aria-label="오늘 볼 것"></section>
   <main class="apps" id="apps"></main>
@@ -91,7 +96,10 @@ footer a { color: var(--accent); }
 const APPS = [
   { id: "daily-brief", name: "Daily Brief", icon: "brief-192.png", href: "/News_Summary/",
     desc: "오클랜드·뉴질랜드·한국 아침 뉴스 요약, 이민 레이더, 동네·치안 지도",
-    data: "/News_Summary/data/latest.json", time: (d) => d.generated_at, usage: "/News_Summary/data/ai-usage.json",
+    data: "/News_Summary/data/latest.json", time: (d) => d.generated_at, ready: "07:00",
+    // 자동 재시도 시각(UTC, daily.yml 의 cron): 일부 실패면 다음 재시도 시각을 보여 줌
+    retries: ["17:25", "17:45", "18:15", "18:25", "18:45", "19:15", "21:10", "01:10"],
+    problem: (d) => (d.meta?.degraded ? `요약 일부 실패${d.meta.degraded_reason ? "(" + d.meta.degraded_reason + ")" : ""}` : ""), usage: "/News_Summary/data/ai-usage.json",
     today: { url: "/News_Summary/data/latest.json", text: (d) => {
       const all = Object.entries(d.sections || {}).filter(([k]) => k !== "kr_politics").flatMap(([, s]) => s.items || []).filter((i) => !i.carried_from);
       const sc = (i) => (i.importance || 0) * 10 + ({ high: 18, medium: 6 }[i.impact?.level] || 0);
@@ -102,7 +110,7 @@ const APPS = [
     } } },
   { id: "whale-radar", name: "웨일 레이더", icon: "whale-192.png", href: "/Whale_Radar/",
     desc: "버핏·애크먼 등 거물 투자자의 SEC 공시와 인터뷰·뉴스를 한국어로",
-    data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at), usage: "/Whale_Radar/data/ai-usage.json",
+    data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at), ready: "18:00", usage: "/Whale_Radar/data/ai-usage.json",
     today: { url: "/Whale_Radar/data/strategy.json", text: (d) => {
       const f = d.bases?.follow, pick = d.recommend?.pick;
       if (!f || !pick) return null;
@@ -112,7 +120,7 @@ const APPS = [
     } } },
   { id: "robotics-radar", name: "로봇 레이더", icon: "robot-192.png", href: "/Robotics_Radar/",
     desc: "휴머노이드·피지컬 AI 기업의 양산·자금·IPO·부품 기회를 부품사·투자 관점으로",
-    data: "/Robotics_Radar/data/dashboard.json", time: (d) => d.generated_at, usage: "/Robotics_Radar/data/ai-usage.json",
+    data: "/Robotics_Radar/data/dashboard.json", time: (d) => d.generated_at, ready: "09:30", usage: "/Robotics_Radar/data/ai-usage.json",
     today: { url: "/Robotics_Radar/data/dashboard.json", text: (d) => {
       const since = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
       const news = (d.news || []).filter((x) => x.date >= since).sort((a, b) => (b.importance || 0) - (a.importance || 0) || (b.n_src || 1) - (a.n_src || 1) || b.date.localeCompare(a.date));
@@ -125,13 +133,14 @@ const APPS = [
 
 // 개인 도구: Claude 비공개 페이지(본인 계정으로 로그인해야 열림). 허브는 페이지 내용을 읽을 수 없어서,
 // 갱신 작업이 끝날 때 이 저장소의 tools-status.json 에 남기는 기록으로 '오늘 갱신됨/안 됨'을 표시합니다.
-// every: "daily"(매일 ready 시각(NZ) 이후 오늘 날짜가 있어야 정상) · "weekly"(7일 이내) · 없음(수동 갱신, 표시 안 함)
+// every: "daily"(매일 ready 시각(NZ) 이후 오늘 날짜가 있어야 정상) · "weekly"(7일 이내)
+//        · "quarterly"(데이터·정책 기준일을 90일마다 다시 점검; updated = 마지막 점검일) · 없음(표시 안 함)
 // 새 도구를 만들면 여기에 한 줄 추가. repo 는 소스·수집기가 있는 비공개 저장소(없으면 생략).
 const TOOLS = [
   { id: "planner", name: "뉴질랜드 이주 설계실", icon: "planner-192.png", href: "https://claude.ai/artifact/6qnLL7cfUe3gqYtzavKq7o",
-    desc: "오클랜드 학군·학교(EQI·NCEA) 분석, 이주 경로 추천, 기간·비용 시뮬레이션, 상담 요약", note: "데이터 갱신 시 수동 · 소스 migration-planner" },
+    desc: "오클랜드 학군·학교(EQI·NCEA) 분석, 이주 경로 추천, 기간·비용 시뮬레이션, 상담 요약", note: "데이터 갱신 시 수동 · 소스 migration-planner", every: "quarterly" },
   { id: "prv", name: "영구영주권 체류 플래너", icon: "prv-192.png", href: "https://claude.ai/artifact/BxteZdapkWvUsvCL7DueRc",
-    desc: "주신청자별 PRV 신청 가능일·체류일수·주택/고용 경로 점검, 정책 Q&A", note: "현행 INZ 기준 · 백업 migration-planner/backup" },
+    desc: "주신청자별 PRV 신청 가능일·체류일수·주택/고용 경로 점검, 정책 Q&A", note: "현행 INZ 기준 · 백업 migration-planner/backup", every: "quarterly" },
   { id: "jobs", name: "오클랜드 채용 레이더", icon: "jobs-192.png", href: "https://claude.ai/artifact/GWkSrPbrmGb6HwGTuSSQhn",
     desc: "오클랜드 채용 공고, 영주권 적격 TOP5, 지원 현황, CV·면접 준비", note: "매일 05:30 갱신 · 소스 Job-Radar", every: "daily", ready: "06:30" },
   { id: "travel", name: "오클랜드 여행 레이더", icon: "travel-192.png", href: "https://claude.ai/artifact/DEcPVo14CSW9wa92RdCB75",
@@ -247,6 +256,29 @@ getJson("/News_Summary/data/status.json").then((st) => {
   if (lines.some(Boolean)) { box.hidden = false; box.innerHTML = `<h2>오늘 볼 것</h2>${lines.join("")}`; }
 })();
 
+// 상단 경고: 오늘 갱신이 안 됐거나 일부 실패한 앱·도구를 한 줄씩 모아 보여 줌
+const problems = new Map();
+function flag(key, name, text) {
+  if (text) problems.set(key, `${name}: ${text}`); else problems.delete(key);
+  const box = document.getElementById("alertbar");
+  box.hidden = !problems.size;
+  box.innerHTML = problems.size ? `<b>⚠️ 확인이 필요한 앱 ${problems.size}개</b>${[...problems.values()].map(esc).join("<br>")}` : "";
+}
+const nzHM = () => new Date().toLocaleTimeString("en-GB", { timeZone: "Pacific/Auckland", hour: "2-digit", minute: "2-digit", hour12: false });
+const nzDateOf = (iso) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Pacific/Auckland" });
+const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+const mdOf = (d) => d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : "";
+/** 다음 자동 재시도 시각(UTC "HH:MM" 목록 → 오클랜드 시각 "HH:MM"), 오늘 남은 게 없으면 "" */
+function nextRetry(list) {
+  const now = new Date(), cands = [];
+  for (const hm of list || []) for (const add of [0, 1]) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + add, +hm.slice(0, 2), +hm.slice(3)));
+    if (d > now && d - now < 12 * 36e5) cands.push(d);
+  }
+  cands.sort((a, b) => a - b);
+  return cands[0] ? cands[0].toLocaleTimeString("en-GB", { timeZone: "Pacific/Auckland", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+}
+
 // 개인 도구 갱신 상태 (tools-status.json: { "<id>": { "updated": "YYYY-MM-DD"(NZ), "at": "HH:MM", "ok": true/false, "note": "..." } })
 (async () => {
   const st = await getJson("/tools-status.json");
@@ -261,15 +293,21 @@ getJson("/News_Summary/data/status.json").then((st) => {
     const r = st?.[t.id];
     const set = (cls, text, m, bad) => { badge.className = `status ${cls}`; badge.textContent = text; meta.textContent = m; meta.classList.toggle("bad", !!bad); };
     if (!r?.updated) { set("wait", "상태 미확인", `${t.note} · 갱신 기록 없음`); continue; }
+    if (t.every === "quarterly") {
+      const age = ago(r.updated), due = new Date(Date.parse(r.updated) + 90 * 864e5).toISOString().slice(0, 10);
+      if (age <= 90) set("ok", "기준일 최신", `기준일 점검 ${md(r.updated)} · 다음 점검 ${md(due)}${r.note ? " · " + r.note : ""}`);
+      else { set("bad", "기준일 점검 필요", `마지막 점검 ${md(r.updated)} (${age}일 전) · 학교 데이터·INZ 정책이 바뀌었는지 확인`, true); flag(t.id, t.name, `기준일 점검 필요 (마지막 ${md(r.updated)})`); }
+      continue;
+    }
     const last = `마지막 갱신 ${md(r.updated)}${r.at ? " " + r.at : ""}`;
     const extra = r.note ? ` · ${r.note}` : "";
     if (t.every === "daily") {
       if (r.updated === day) set(r.ok === false ? "wait" : "ok", r.ok === false ? "오늘 부분 갱신" : "오늘 갱신됨", `${last}${extra}`, r.ok === false);
       else if (ago(r.updated) === 1 && nowHM < (t.ready || "07:00")) set("wait", "갱신 대기", `오늘 ${t.ready || "07:00"} 전 갱신 예정 · ${last}`);
-      else set("bad", "오늘 갱신 안 됨", `${last}${extra}`, true);
+      else { set("bad", "오늘 갱신 안 됨", `${last}${extra}`, true); flag(t.id, t.name, `오늘 갱신 안 됨 (마지막 ${md(r.updated)})`); }
     } else {
       if (ago(r.updated) <= 7) set(r.ok === false ? "wait" : "ok", r.ok === false ? "부분 갱신" : "최신", `${last}${extra}`, r.ok === false);
-      else set("bad", "갱신 안 됨", `${last} (${ago(r.updated)}일 전)`, true);
+      else { set("bad", "갱신 안 됨", `${last} (${ago(r.updated)}일 전)`, true); flag(t.id, t.name, `${ago(r.updated)}일째 갱신 안 됨`); }
     }
   }
 })();
@@ -280,10 +318,24 @@ APPS.forEach(async (a, i) => {
   try {
     const r = await fetch(a.data, { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
-    const t = a.time(await r.json());
+    const d = await r.json();
+    const t = a.time(d);
     if (!t) throw new Error("no data");
-    st.textContent = "운영 중"; st.className = "status ok";
-    meta.textContent = `업데이트 ${rel(t)}`;
+    const day = nzToday(), upd = nzDateOf(t), prob = a.problem ? a.problem(d) : "";
+    meta.classList.remove("bad");
+    if (upd !== day && !(daysBetween(upd, day) === 1 && nzHM() < (a.ready || "07:00"))) {
+      st.textContent = "오늘 갱신 안 됨"; st.className = "status bad"; meta.classList.add("bad");
+      meta.textContent = `마지막 업데이트 ${mdOf(upd)} · ${rel(t)}`;
+      flag(a.id, a.name, `오늘 갱신 안 됨 (마지막 ${mdOf(upd)})`);
+    } else if (prob) {
+      const nx = nextRetry(a.retries);
+      st.textContent = "일부 실패 · 복구 중"; st.className = "status wait"; meta.classList.add("bad");
+      meta.textContent = `${prob} · ${nx ? `다음 자동 재시도 ${nx}` : "오늘 자동 재시도 끝남"} · 업데이트 ${rel(t)}`;
+      flag(a.id, a.name, `${prob} — ${nx ? `${nx} 자동 재시도` : "자동 재시도 끝남, 수동 확인 필요"}`);
+    } else {
+      st.textContent = upd === day ? "오늘 갱신됨" : "갱신 대기"; st.className = `status ${upd === day ? "ok" : "wait"}`;
+      meta.textContent = upd === day ? `업데이트 ${rel(t)}` : `오늘 ${a.ready} 전 갱신 예정 · 업데이트 ${rel(t)}`;
+    }
   } catch {
     st.textContent = "준비 중"; st.className = "status wait";
     meta.textContent = "아직 데이터가 없어요";

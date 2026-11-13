@@ -155,6 +155,8 @@ const TOOLS = [
     desc: "오클랜드 채용 공고, 영주권 적격 TOP5, 지원 현황, CV·면접 준비", note: "매일 05:30 갱신 · 소스 Job-Radar", every: "daily", ready: "06:30", autoRecord: false },
   { id: "travel", name: "오클랜드 여행 레이더", icon: "travel-192.png", href: "https://claude.ai/artifact/DEcPVo14CSW9wa92RdCB75",
     desc: "인천 직항·세계 최저가 항공권, 오클랜드 출항 크루즈, F1 일정", note: "매주 금요일 갱신", every: "weekly", autoRecord: false },
+  { id: "leave", name: "휴직 연차 캘린더", icon: "leave-192.png", href: "https://claude.ai/code/artifact/6dbf428c-b06f-47b9-b2c8-9139fbca5e85",
+    desc: "육아휴직 2026–2030: 휴직 종료일, 하기휴가 대상, 연차·롱스테이·경조휴가, 뉴질랜드 연차 계산", note: "직접 입력 · 기기 간 자동 저장" },
 ];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const rel = (iso) => {

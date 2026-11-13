@@ -143,6 +143,7 @@ const APPS = [
 // 개인 도구: Claude 비공개 페이지(본인 계정으로 로그인해야 열림). 허브는 페이지 내용을 읽을 수 없어서,
 // 갱신 작업이 끝날 때 이 저장소의 tools-status.json 에 남기는 기록으로 '오늘 갱신됨/안 됨'을 표시합니다.
 // every: "daily"(매일 ready 시각(NZ) 이후 오늘 날짜가 있어야 정상) · "weekly"(7일 이내)
+// autoRecord: false = 갱신 작업(Claude 예약 작업)이 이 저장소에 기록을 남길 수 없는 도구. 기록이 오래돼도 '갱신 안 됨'으로 단정하지 않고 '확인 불가'로 표시
 //        · "quarterly"(데이터·정책 기준일을 90일마다 다시 점검; updated = 마지막 점검일) · 없음(표시 안 함)
 // 새 도구를 만들면 여기에 한 줄 추가. repo 는 소스·수집기가 있는 비공개 저장소(없으면 생략).
 const TOOLS = [
@@ -151,9 +152,9 @@ const TOOLS = [
   { id: "prv", name: "영구영주권 체류 플래너", icon: "prv-192.png", href: "https://claude.ai/artifact/BxteZdapkWvUsvCL7DueRc",
     desc: "주신청자별 PRV 신청 가능일·체류일수·주택/고용 경로 점검, 정책 Q&A", note: "현행 INZ 기준 · 백업 migration-planner/backup", every: "quarterly" },
   { id: "jobs", name: "오클랜드 채용 레이더", icon: "jobs-192.png", href: "https://claude.ai/artifact/GWkSrPbrmGb6HwGTuSSQhn",
-    desc: "오클랜드 채용 공고, 영주권 적격 TOP5, 지원 현황, CV·면접 준비", note: "매일 05:30 갱신 · 소스 Job-Radar", every: "daily", ready: "06:30" },
+    desc: "오클랜드 채용 공고, 영주권 적격 TOP5, 지원 현황, CV·면접 준비", note: "매일 05:30 갱신 · 소스 Job-Radar", every: "daily", ready: "06:30", autoRecord: false },
   { id: "travel", name: "오클랜드 여행 레이더", icon: "travel-192.png", href: "https://claude.ai/artifact/DEcPVo14CSW9wa92RdCB75",
-    desc: "인천 직항·세계 최저가 항공권, 오클랜드 출항 크루즈, F1 일정", note: "매주 금요일 갱신", every: "weekly" },
+    desc: "인천 직항·세계 최저가 항공권, 오클랜드 출항 크루즈, F1 일정", note: "매주 금요일 갱신", every: "weekly", autoRecord: false },
 ];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const rel = (iso) => {
@@ -309,13 +310,16 @@ function nextRetry(list) {
       continue;
     }
     const last = `마지막 갱신 ${md(r.updated)}${r.at ? " " + r.at : ""}`;
+    const unknown = () => set("wait", "갱신 확인 불가", `${t.note} · 마지막 기록 ${md(r.updated)} · 예약 작업이 허브에 기록을 남길 수 없어 실제 갱신 여부는 페이지에서 확인`);
     const extra = r.note ? ` · ${r.note}` : "";
     if (t.every === "daily") {
       if (r.updated === day) set(r.ok === false ? "wait" : "ok", r.ok === false ? "오늘 부분 갱신" : "오늘 갱신됨", `${last}${extra}`, r.ok === false);
       else if (ago(r.updated) === 1 && nowHM < (t.ready || "07:00")) set("wait", "갱신 대기", `오늘 ${t.ready || "07:00"} 전 갱신 예정 · ${last}`);
+      else if (t.autoRecord === false) unknown();
       else { set("bad", "오늘 갱신 안 됨", `${last}${extra}`, true); flag(t.id, t.name, `오늘 갱신 안 됨 (마지막 ${md(r.updated)})`); }
     } else {
       if (ago(r.updated) <= 7) set(r.ok === false ? "wait" : "ok", r.ok === false ? "부분 갱신" : "최신", `${last}${extra}`, r.ok === false);
+      else if (t.autoRecord === false) unknown();
       else { set("bad", "갱신 안 됨", `${last} (${ago(r.updated)}일 전)`, true); flag(t.id, t.name, `${ago(r.updated)}일째 갱신 안 됨`); }
     }
   }

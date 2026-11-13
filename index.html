@@ -184,14 +184,16 @@ const TOOLS = [
   { id: "prv", name: "영구영주권 체류 플래너", icon: "prv-192.png", href: "https://claude.ai/artifact/BxteZdapkWvUsvCL7DueRc",
     desc: "주신청자별 PRV 신청 가능일·체류일수·주택/고용 경로 점검, 정책 Q&A", note: "현행 INZ 기준 · 백업 migration-planner/backup", every: "quarterly" },
   { id: "jobs", name: "오클랜드 채용 레이더", icon: "jobs-192.png", href: "https://claude.ai/artifact/GWkSrPbrmGb6HwGTuSSQhn",
-    desc: "오클랜드 채용 공고, 영주권 적격 TOP5, 지원 현황, CV·면접 준비", note: "매일 05:30 갱신 · 소스 Job-Radar", every: "daily", ready: "06:30", autoRecord: false, sched: { at: "05:30" } },
+    desc: "오클랜드 채용 공고, 영주권 적격 TOP5, 지원 현황, CV·면접 준비", note: "매일 05:07 갱신 · 소스 Job-Radar", every: "daily", ready: "06:30", autoRecord: false, sched: { at: "05:07" } },
   { id: "travel", name: "오클랜드 여행 레이더", icon: "travel-192.png", href: "https://claude.ai/artifact/DEcPVo14CSW9wa92RdCB75",
     desc: "인천 직항·세계 최저가 항공권, 오클랜드 출항 크루즈, F1 일정", note: "매주 금요일 갱신", every: "weekly", autoRecord: false, sched: { at: "08:46", dow: 5 } },
   { id: "leave", name: "휴직 연차 캘린더", icon: "leave-192.png", href: "https://claude.ai/code/artifact/6dbf428c-b06f-47b9-b2c8-9139fbca5e85",
     desc: "육아휴직 2026–2030: 휴직 종료일, 하기휴가 대상, 연차·롱스테이·경조휴가, 뉴질랜드 연차 계산", note: "직접 입력 · 기기 간 자동 저장", sched: { manual: true } },
+  { id: "dividend", name: "배당·세금·건보료 대시보드", icon: "dividend-192.png", href: "https://claude.ai/code/artifact/4938d41d-8540-41e9-a3f0-9fd3f4103754",
+    desc: "보유 종목 배당 기준 한국·NZ 세금과 건보료 시뮬레이션: 연도별 부담, 세후 수령, 휴직·체류에 따른 신분과 일정", note: "직접 입력 · 기기 간 자동 저장", sched: { manual: true } },
   { id: "stock", name: "Stock Timing · 매매 적기", icon: "stock-192.png", href: "https://stock-advisor.gundog0109.workers.dev/",
     desc: "주식 매수·매도 적기 판단: 시장 신호와 미 연준·한국은행 금리 일정",
-    note: "Cloudflare 로그인 필요 · 금리 데이터 매월 1·15일 자동 점검 · 소스 Stock_Advisor", sched: { label: "격주 (매월 1·15일)" } },
+    note: "Cloudflare 로그인 필요 · 금리 데이터는 FOMC·금통위 다음 날 반영(매월 1일 점검) · 소스 Stock_Advisor", sched: { label: "회의 다음 날 + 매월 1일" } },
 ];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const rel = (iso) => {

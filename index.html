@@ -155,6 +155,15 @@ const APPS = [
       const who = (news[0].companies || []).slice(0, 2).map((id) => nm[id]).filter(Boolean).join(", ");
       return [news[0].title_ko || news[0].title, `${who ? who + " · " : ""}최근 7일 소식 ${news.length}건 · 핵심 ${key}건${(d.alerts || []).length ? ` · 경보 ${d.alerts.length}건` : ""}`];
     } } },
+  { id: "fx-radar", name: "FX Radar", icon: "fx-192.png", href: "/FX_Radar/",
+    desc: "NZD/KRW 환율 추이, 1년 중 위치, 송금 방향별 유리·불리, 업체 견적 비교",
+    data: "/FX_Radar/data/fx.json", time: (d) => d.generated_at, usage: null, ready: "07:00", sched: { at: "16:37", utc: true },
+    today: { url: "/FX_Radar/data/fx.json", text: (d) => {
+      const k = d.pairs?.KRW, sg = d.signal;
+      if (!k || !sg) return null;
+      const al = (d.new_alerts || [])[0];
+      return [`NZD/KRW ${k.last.toFixed(2)}원 · 한국→NZ 송금 ${sg.to_nz} · NZ→한국 ${sg.to_kr}`, al ? `🔔 ${al}` : `${sg.text} · 기준일 ${k.date.slice(5).replace("-", "/")}`];
+    } } },
 ];
 
 // 개인 도구: Claude 비공개 페이지(본인 계정으로 로그인해야 열림). 허브는 페이지 내용을 읽을 수 없어서,

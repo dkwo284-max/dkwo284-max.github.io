@@ -189,8 +189,6 @@ const TOOLS = [
   { id: "stock", name: "Stock Timing · 매매 적기", icon: "stock-192.png", href: "https://stock-advisor.gundog0109.workers.dev/",
     desc: "주식 매수·매도 적기 판단: 시장 신호와 미 연준·한국은행 금리 일정",
     note: "Cloudflare 로그인 필요 · 금리 데이터 매월 1·15일 자동 점검 · 소스 Stock_Advisor", sched: { label: "격주 (매월 1·15일)" } },
-  { id: "docs", name: "서류 만료일 트래커", icon: "docs-192.png", href: "https://claude.ai/artifact/G6R6WR4keF2hTTN3ZkfwUR",
-    desc: "여권·비자·운전면허·차량 WOF/Rego·보험 만료일과 갱신 시작 권장일, 1년 눈금자", note: "직접 입력 · 90·30·7일 전 카톡 알림(매일 06:25 점검)", sched: { manual: true } },
 ];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const rel = (iso) => {

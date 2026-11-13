@@ -65,6 +65,22 @@ h1 { margin: 0; font-size: 1.4rem; }
 @media (prefers-color-scheme: dark) { .alertbar { background: #3b1714; border-color: #6b2a24; color: #ffd7d2; } }
 .alertbar b { display: block; margin-bottom: 2px; }
 .alertbar a { color: inherit; }
+.board { margin: 0 0 14px; padding: 10px 12px 6px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.board h2 { margin: 0 0 4px; font-size: .95rem; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.board h2 small { font-weight: 400; font-size: .74rem; color: var(--muted); }
+.board a { display: grid; grid-template-columns: 12px 22px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; font-size: .84rem; }
+.board a:first-of-type { border-top: 0; }
+.board img { width: 22px; height: 22px; border-radius: 6px; }
+.board .nm b { display: block; font-size: .86rem; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board .nm small, .board .tm small { display: block; color: var(--muted); font-size: .72rem; line-height: 1.3; }
+.board .tm { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.board .tm span { font-size: .8rem; }
+.bdot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.bdot.ok { background: var(--ok); } .bdot.wait { background: #f5a524; } .bdot.bad { background: #d92d20; }
+.bdot.none { background: transparent; border: 2px solid var(--muted); width: 6px; height: 6px; }
+.bdot.unk { background: transparent; border: 2px dashed #f5a524; width: 6px; height: 6px; }
+.board .key { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--line); font-size: .72rem; color: var(--muted); }
+.board .key span { display: inline-flex; align-items: center; gap: 4px; }
 .status.priv { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .app.soon { box-shadow: none; background: transparent; border-style: dashed; cursor: default; }
 .today3 { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--line, #e5e7eb); border-radius: 14px; }
@@ -83,6 +99,7 @@ footer a { color: var(--accent); }
   <header><img src="icon.svg" alt=""><h1>My Hub</h1></header>
   <p class="today" id="today"></p>
   <section class="alertbar" id="alertbar" hidden role="status"></section>
+  <section class="board" id="board" hidden aria-label="앱 갱신 현황"></section>
   <section class="usage" id="usage" hidden></section>
   <section class="today3" id="today3" hidden aria-label="오늘 볼 것"></section>
   <main class="apps" id="apps"></main>
@@ -96,7 +113,7 @@ footer a { color: var(--accent); }
 const APPS = [
   { id: "daily-brief", name: "Daily Brief", icon: "brief-192.png", href: "/News_Summary/",
     desc: "오클랜드·뉴질랜드·한국 아침 뉴스 요약, 이민 레이더, 동네·치안 지도",
-    data: "/News_Summary/data/latest.json", time: (d) => d.generated_at, ready: "07:00",
+    data: "/News_Summary/data/latest.json", time: (d) => d.generated_at, ready: "07:00", sched: { at: "06:00" },
     // 자동 재시도 시각(UTC, daily.yml 의 cron): 일부 실패면 다음 재시도 시각을 보여 줌
     retries: ["17:25", "17:45", "18:15", "18:25", "18:45", "19:15", "21:10", "01:10"],
     problem: (d) => (d.meta?.degraded ? `요약 일부 실패${d.meta.degraded_reason ? "(" + d.meta.degraded_reason + ")" : ""}` : ""), usage: "/News_Summary/data/ai-usage.json",
@@ -110,7 +127,7 @@ const APPS = [
     } } },
   { id: "whale-radar", name: "웨일 레이더", icon: "whale-192.png", href: "/Whale_Radar/",
     desc: "버핏·애크먼 등 거물 투자자의 SEC 공시와 인터뷰·뉴스를 한국어로",
-    data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at), ready: "18:00", usage: "/Whale_Radar/data/ai-usage.json",
+    data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at), ready: "18:00", sched: { at: "03:37", utc: true }, usage: "/Whale_Radar/data/ai-usage.json",
     today: { url: "/Whale_Radar/data/strategy.json", text: (d) => {
       const f = d.bases?.follow, pick = d.recommend?.pick;
       if (!f || !pick) return null;
@@ -129,7 +146,7 @@ const APPS = [
     } } },
   { id: "robotics-radar", name: "로봇 레이더", icon: "robot-192.png", href: "/Robotics_Radar/",
     desc: "휴머노이드·피지컬 AI 기업의 양산·자금·IPO·부품 기회를 부품사·투자 관점으로",
-    data: "/Robotics_Radar/data/dashboard.json", time: (d) => d.generated_at, ready: "09:30", usage: "/Robotics_Radar/data/ai-usage.json",
+    data: "/Robotics_Radar/data/dashboard.json", time: (d) => d.generated_at, ready: "09:30", sched: { at: "19:10", utc: true }, usage: "/Robotics_Radar/data/ai-usage.json",
     today: { url: "/Robotics_Radar/data/dashboard.json", text: (d) => {
       const since = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
       const news = (d.news || []).filter((x) => x.date >= since).sort((a, b) => (b.importance || 0) - (a.importance || 0) || (b.n_src || 1) - (a.n_src || 1) || b.date.localeCompare(a.date));
@@ -152,11 +169,11 @@ const TOOLS = [
   { id: "prv", name: "영구영주권 체류 플래너", icon: "prv-192.png", href: "https://claude.ai/artifact/BxteZdapkWvUsvCL7DueRc",
     desc: "주신청자별 PRV 신청 가능일·체류일수·주택/고용 경로 점검, 정책 Q&A", note: "현행 INZ 기준 · 백업 migration-planner/backup", every: "quarterly" },
   { id: "jobs", name: "오클랜드 채용 레이더", icon: "jobs-192.png", href: "https://claude.ai/artifact/GWkSrPbrmGb6HwGTuSSQhn",
-    desc: "오클랜드 채용 공고, 영주권 적격 TOP5, 지원 현황, CV·면접 준비", note: "매일 05:30 갱신 · 소스 Job-Radar", every: "daily", ready: "06:30", autoRecord: false },
+    desc: "오클랜드 채용 공고, 영주권 적격 TOP5, 지원 현황, CV·면접 준비", note: "매일 05:30 갱신 · 소스 Job-Radar", every: "daily", ready: "06:30", autoRecord: false, sched: { at: "05:30" } },
   { id: "travel", name: "오클랜드 여행 레이더", icon: "travel-192.png", href: "https://claude.ai/artifact/DEcPVo14CSW9wa92RdCB75",
-    desc: "인천 직항·세계 최저가 항공권, 오클랜드 출항 크루즈, F1 일정", note: "매주 금요일 갱신", every: "weekly", autoRecord: false },
+    desc: "인천 직항·세계 최저가 항공권, 오클랜드 출항 크루즈, F1 일정", note: "매주 금요일 갱신", every: "weekly", autoRecord: false, sched: { at: "08:46", dow: 5 } },
   { id: "leave", name: "휴직 연차 캘린더", icon: "leave-192.png", href: "https://claude.ai/code/artifact/6dbf428c-b06f-47b9-b2c8-9139fbca5e85",
-    desc: "육아휴직 2026–2030: 휴직 종료일, 하기휴가 대상, 연차·롱스테이·경조휴가, 뉴질랜드 연차 계산", note: "직접 입력 · 기기 간 자동 저장" },
+    desc: "육아휴직 2026–2030: 휴직 종료일, 하기휴가 대상, 연차·롱스테이·경조휴가, 뉴질랜드 연차 계산", note: "직접 입력 · 기기 간 자동 저장", sched: { manual: true } },
 ];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const rel = (iso) => {
@@ -269,6 +286,63 @@ getJson("/News_Summary/data/status.json").then((st) => {
 })();
 
 // 상단 경고: 오늘 갱신이 안 됐거나 일부 실패한 앱·도구를 한 줄씩 모아 보여 줌
+// 상단 갱신 현황판: 앱마다 상태 점(초록 갱신됨·노랑 대기/부분·빨강 안 됨·점선 확인 불가·빈 원 수동), 주기, 마지막 갱신, 다음 예정
+const boardRows = new Map();
+const KO_DOW = "일월화수목금토";
+function nzParts(d = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Pacific/Auckland", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(d).map((x) => [x.type, x.value]));
+  return { dow: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.weekday), hm: `${p.hour % 24 < 10 ? "0" : ""}${+p.hour % 24}:${p.minute}` };
+}
+/** 예약 시각을 오클랜드 "HH:MM" 으로 (utc: true 면 오늘 날짜 기준으로 변환, 서머타임 반영) */
+function schedHM(sc) {
+  if (!sc.utc) return sc.at;
+  const n = new Date(), d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate(), +sc.at.slice(0, 2), +sc.at.slice(3)));
+  return d.toLocaleTimeString("en-GB", { timeZone: "Pacific/Auckland", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+function cadence(x) {
+  const sc = x.sched || {};
+  if (sc.manual) return "직접 입력";
+  if (x.every === "quarterly") return "90일마다 기준일 점검";
+  if (sc.dow != null) return `매주 ${KO_DOW[sc.dow]}요일 ${schedHM(sc)}`;
+  return sc.at ? `매일 ${schedHM(sc)}` : "";
+}
+function nextRun(x, quarterlyFrom) {
+  const sc = x.sched || {};
+  if (sc.manual) return "";
+  if (x.every === "quarterly") return quarterlyFrom ? `점검 ${mdOf(new Date(Date.parse(quarterlyFrom) + 90 * 864e5).toISOString().slice(0, 10))}` : "";
+  if (!sc.at) return "";
+  const { dow, hm } = nzParts(), at = schedHM(sc);
+  if (sc.dow != null) {
+    let k = (sc.dow - dow + 7) % 7;
+    if (k === 0 && hm >= at) k = 7;
+    const d = new Date(Date.now() + k * 864e5).toLocaleDateString("sv-SE", { timeZone: "Pacific/Auckland" });
+    return k === 0 ? `오늘 ${at}` : k === 1 ? `내일 ${at}` : `${mdOf(d)}(${KO_DOW[sc.dow]}) ${at}`;
+  }
+  return `${hm < at ? "오늘" : "내일"} ${at}`;
+}
+function bset(id, patch) {
+  boardRows.set(id, { ...(boardRows.get(id) || {}), ...patch });
+  const box = document.getElementById("board");
+  if (!box) return;
+  const items = [...APPS.map((a, i) => ({ x: a, key: a.id, anchor: `app-${i}` })), ...TOOLS.map((t) => ({ x: t, key: t.id, anchor: `tool-${t.id}` }))];
+  box.hidden = false;
+  box.innerHTML = `<h2>갱신 현황 <small>오클랜드 ${esc(nzParts().hm)} 기준</small></h2>` + items.map(({ x, key, anchor }) => {
+    const r = boardRows.get(key) || { cls: "", text: "확인 중" };
+    const nx = nextRun(x, r.checked);
+    return `<a href="#${anchor}" title="${esc(r.text)}"><i class="bdot ${esc(r.cls || "")}" aria-hidden="true"></i><img src="${esc(x.icon)}" alt="">
+      <span class="nm"><b>${esc(x.name)}</b><small>${esc(cadence(x))}${r.text ? " · " + esc(r.text) : ""}</small></span>
+      <span class="tm"><span>${esc(r.last || "—")}</span>${nx ? `<small>다음 ${esc(nx)}</small>` : ""}</span></a>`;
+  }).join("") + `<div class="key"><span><i class="bdot ok"></i>갱신됨</span><span><i class="bdot wait"></i>대기·부분</span><span><i class="bdot bad"></i>안 됨</span><span><i class="bdot unk"></i>확인 불가</span><span><i class="bdot none"></i>수동</span></div>`;
+}
+document.addEventListener("click", (e) => {  // 현황판 줄을 누르면 해당 카드로 부드럽게 이동하고 잠깐 강조
+  const a = e.target.closest?.(".board a");
+  if (!a) return;
+  const card = document.getElementById(a.getAttribute("href").slice(1));
+  if (!card) return;
+  e.preventDefault();
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  card.animate?.([{ boxShadow: "0 0 0 3px var(--accent)" }, { boxShadow: "none" }], { duration: 1400 });
+});
 const problems = new Map();
 function flag(key, name, text) {
   if (text) problems.set(key, `${name}: ${text}`); else problems.delete(key);
@@ -298,12 +372,18 @@ function nextRetry(list) {
   const nowHM = new Date().toLocaleTimeString("en-GB", { timeZone: "Pacific/Auckland", hour: "2-digit", minute: "2-digit", hour12: false });
   const md = (d) => d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : "";
   const ago = (d) => Math.round((Date.parse(day) - Date.parse(d)) / 864e5);
+  for (const t of TOOLS.filter((x) => !x.every)) bset(t.id, { cls: "none", text: "", last: "수동" });
   for (const t of TOOLS.filter((x) => x.every)) {
     const card = document.getElementById(`tool-${t.id}`);
     if (!card) continue;
     const badge = card.querySelector("[data-st]"), meta = card.querySelector("[data-meta]");
     const r = st?.[t.id];
-    const set = (cls, text, m, bad) => { badge.className = `status ${cls}`; badge.textContent = text; meta.textContent = m; meta.classList.toggle("bad", !!bad); };
+    const set = (cls, text, m, bad) => {
+      badge.className = `status ${cls}`; badge.textContent = text; meta.textContent = m; meta.classList.toggle("bad", !!bad);
+      const unk = /확인 불가|미확인/.test(text);
+      bset(t.id, { cls: unk ? "unk" : cls, text, last: r?.updated ? (r.updated === day ? `오늘 ${r.at || ""}`.trim() : `${md(r.updated)}${r.at ? " " + r.at : ""}`) : "—",
+        checked: t.every === "quarterly" ? r?.updated : undefined });
+    };
     if (!r?.updated) { set("wait", "상태 미확인", `${t.note} · 갱신 기록 없음`); continue; }
     if (t.every === "quarterly") {
       const age = ago(r.updated), due = new Date(Date.parse(r.updated) + 90 * 864e5).toISOString().slice(0, 10);
@@ -337,22 +417,28 @@ APPS.forEach(async (a, i) => {
     const t = a.time(d);
     if (!t) throw new Error("no data");
     const day = nzToday(), upd = nzDateOf(t), prob = a.problem ? a.problem(d) : "";
+    const hmOf = new Date(t).toLocaleTimeString("en-GB", { timeZone: "Pacific/Auckland", hour: "2-digit", minute: "2-digit", hour12: false });
+    const lastTxt = upd === day ? `오늘 ${hmOf}` : `${mdOf(upd)} ${hmOf}`;
     meta.classList.remove("bad");
     if (upd !== day && !(daysBetween(upd, day) === 1 && nzHM() < (a.ready || "07:00"))) {
       st.textContent = "오늘 갱신 안 됨"; st.className = "status bad"; meta.classList.add("bad");
       meta.textContent = `마지막 업데이트 ${mdOf(upd)} · ${rel(t)}`;
       flag(a.id, a.name, `오늘 갱신 안 됨 (마지막 ${mdOf(upd)})`);
+      bset(a.id, { cls: "bad", text: "오늘 갱신 안 됨", last: lastTxt });
     } else if (prob) {
       const nx = nextRetry(a.retries);
       st.textContent = "일부 실패 · 복구 중"; st.className = "status wait"; meta.classList.add("bad");
       meta.textContent = `${prob} · ${nx ? `다음 자동 재시도 ${nx}` : "오늘 자동 재시도 끝남"} · 업데이트 ${rel(t)}`;
       flag(a.id, a.name, `${prob} — ${nx ? `${nx} 자동 재시도` : "자동 재시도 끝남, 수동 확인 필요"}`);
+      bset(a.id, { cls: "wait", text: "일부 실패", last: lastTxt });
     } else {
       st.textContent = upd === day ? "오늘 갱신됨" : "갱신 대기"; st.className = `status ${upd === day ? "ok" : "wait"}`;
+      bset(a.id, { cls: upd === day ? "ok" : "wait", text: upd === day ? "" : "갱신 대기", last: lastTxt });
       meta.textContent = upd === day ? `업데이트 ${rel(t)}` : `오늘 ${a.ready} 전 갱신 예정 · 업데이트 ${rel(t)}`;
     }
   } catch {
     st.textContent = "준비 중"; st.className = "status wait";
+    bset(a.id, { cls: "unk", text: "데이터 없음", last: "—" });
     meta.textContent = "아직 데이터가 없어요";
   }
 });

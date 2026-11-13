@@ -155,6 +155,9 @@ const APPS = [
       const who = (news[0].companies || []).slice(0, 2).map((id) => nm[id]).filter(Boolean).join(", ");
       return [news[0].title_ko || news[0].title, `${who ? who + " · " : ""}최근 7일 소식 ${news.length}건 · 핵심 ${key}건${(d.alerts || []).length ? ` · 경보 ${d.alerts.length}건` : ""}`];
     } } },
+  { id: "leisure", name: "주말 나들이", icon: "leisure-192.png", href: "/News_Summary/leisure.html",
+    desc: "오클랜드 가족 나들이: 주말 코스, 지금 영업 중, 요금·운영 시간, 지도, 회원권 비교",
+    data: "/News_Summary/data/leisure.json", time: (d) => d.updated_at, ready: "12:00", sched: { at: "21:47", utc: true } },
   { id: "fx-radar", name: "FX Radar", icon: "fx-192.png", href: "/FX_Radar/",
     desc: "NZD/KRW 환율 추이, 1년 중 위치, 송금 방향별 유리·불리, 업체 견적 비교",
     data: "/FX_Radar/data/fx.json", time: (d) => d.generated_at, usage: null, ready: "07:00", sched: { at: "16:37", utc: true },

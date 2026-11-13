@@ -174,6 +174,8 @@ const TOOLS = [
     desc: "인천 직항·세계 최저가 항공권, 오클랜드 출항 크루즈, F1 일정", note: "매주 금요일 갱신", every: "weekly", autoRecord: false, sched: { at: "08:46", dow: 5 } },
   { id: "leave", name: "휴직 연차 캘린더", icon: "leave-192.png", href: "https://claude.ai/code/artifact/6dbf428c-b06f-47b9-b2c8-9139fbca5e85",
     desc: "육아휴직 2026–2030: 휴직 종료일, 하기휴가 대상, 연차·롱스테이·경조휴가, 뉴질랜드 연차 계산", note: "직접 입력 · 기기 간 자동 저장", sched: { manual: true } },
+  { id: "docs", name: "서류 만료일 트래커", icon: "docs-192.png", href: "https://claude.ai/artifact/G6R6WR4keF2hTTN3ZkfwUR",
+    desc: "여권·비자·운전면허·차량 WOF/Rego·보험 만료일과 갱신 시작 권장일, 1년 눈금자", note: "직접 입력 · 90·30·7일 전 카톡 알림(매일 06:25 점검)", sched: { manual: true } },
 ];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const rel = (iso) => {

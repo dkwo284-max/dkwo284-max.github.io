@@ -430,9 +430,11 @@ APPS.forEach(async (a, i) => {
     const d = await r.json();
     const t = a.time(d);
     if (!t) throw new Error("no data");
-    const day = nzToday(), upd = nzDateOf(t), prob = a.problem ? a.problem(d) : "";
-    const hmOf = new Date(t).toLocaleTimeString("en-GB", { timeZone: "Pacific/Auckland", hour: "2-digit", minute: "2-digit", hour12: false });
-    const lastTxt = upd === day ? `오늘 ${hmOf}` : `${mdOf(upd)} ${hmOf}`;
+    const day = nzToday(), upd = /^\d{4}-\d{2}-\d{2}$/.test(String(t)) ? String(t) : nzDateOf(t), prob = a.problem ? a.problem(d) : "";
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(t));  // 날짜만 있는 데이터(레저 등)는 시각을 지어내지 않는다
+    const upd2 = dateOnly ? String(t) : upd;
+    const hmOf = dateOnly ? "" : new Date(t).toLocaleTimeString("en-GB", { timeZone: "Pacific/Auckland", hour: "2-digit", minute: "2-digit", hour12: false });
+    const lastTxt = `${upd2 === day ? "오늘" : mdOf(upd2)} ${hmOf}`.trim();
     meta.classList.remove("bad");
     if (upd !== day && !(daysBetween(upd, day) === 1 && nzHM() < (a.ready || "07:00"))) {
       st.textContent = "오늘 갱신 안 됨"; st.className = "status bad"; meta.classList.add("bad");

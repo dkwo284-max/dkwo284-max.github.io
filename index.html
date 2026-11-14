@@ -53,6 +53,15 @@ h1 { margin: 0; font-size: 1.4rem; }
 .usage .bar { height: 6px; border-radius: 3px; background: var(--line); margin-top: 8px; overflow: hidden; }
 .usage .bar i { display: block; height: 100%; background: var(--accent); }
 .usage small { display: block; color: var(--muted); margin-top: 6px; }
+.usage .urows { display: grid; gap: 6px; margin-top: 10px; }
+.usage .urow { display: grid; grid-template-columns: minmax(84px, 9em) 1fr auto auto; gap: 8px; align-items: center; }
+.usage .urow .bar { margin-top: 0; }
+.usage .bar i.over, .usage .u7 i.over { background: #dc2626; }
+.usage .un { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.usage .uv { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 3.2em; text-align: right; }
+.usage .u7 { display: inline-flex; align-items: flex-end; gap: 2px; height: 18px; }
+.usage .u7 i { display: block; width: 6px; height: var(--h); min-height: 2px; border-radius: 2px; background: var(--accent); opacity: .85; }
+.usage .u7 i.no { height: 2px; background: var(--line); opacity: 1; }
 .ai { font-size: .78rem; color: var(--muted); }
 .app > :not(img):not(.ph) { grid-column: 2; }
 .hello { color: var(--muted); font-size: .95rem; padding: 24px 0; }
@@ -249,8 +258,8 @@ root.innerHTML = APPS.map((a, i) => `
     <p>새 앱을 만들면 여기에 추가돼요.</p>
   </div>`;
 
-// AI(Gemini) 사용량: 예산표(budget.json)와 각 앱의 ai-usage.json 을 읽어 오늘(오클랜드 00시 기준) 사용량과 공유 예비분을 보여줌.
-// 세 앱이 같은 Gemini 키를 나눠 쓰며, 각 앱은 자기 보장량 + 공유 예비분 안에서만 요청합니다.
+// AI(Gemini) 사용량: 예산표(budget.json)와 각 앱의 ai-usage.json 을 읽어 오늘(오클랜드 00시 기준) 사용량과 최근 7일 추이를 보여줌.
+// 앱마다 자기 Gemini 키(프로젝트)를 쓰고, 각 앱은 budget.json 의 자기 하루 한도 안에서만 요청합니다.
 const nzToday = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Pacific/Auckland" });  // YYYY-MM-DD
 async function getJson(url) { try { const r = await fetch(url, { cache: "no-store" }); return r.ok ? await r.json() : null; } catch { return null; } }
 async function loadUsage() {
@@ -260,13 +269,14 @@ async function loadUsage() {
     const u = a.usage ? await getJson(a.usage) : null;
     const g = budget?.apps?.[a.id]?.guaranteed ?? u?.cap ?? 0;
     const d = u?.days?.[day];
-    return { a, known: !!u, n: d?.requests ?? 0, runs: d?.runs ?? 0, g, by: d?.by || {}, week: Object.entries(u?.days || {}).sort().slice(-7).reduce((s, [, x]) => s + (x.requests || 0), 0) };
+    const days7 = [...Array(7)].map((_, k) => { const dt = new Date(Date.parse(day) - (6 - k) * 864e5).toISOString().slice(0, 10), x = u?.days?.[dt]; return { dt, n: x?.requests ?? 0, runs: x?.runs ?? 0, has: !!x }; });
+    return { a, known: !!u, days7, n: d?.requests ?? 0, runs: d?.runs ?? 0, g, by: d?.by || {}, week: Object.entries(u?.days || {}).sort().slice(-7).reduce((s, [, x]) => s + (x.requests || 0), 0) };
   }));
   rows.forEach(({ a, known, n, runs, g }) => {
     const i = APPS.indexOf(a), el = document.querySelector(`#app-${i} [data-ai]`);
     const r = rows.find((x) => x.a === a), KIND = { scheduled: "정기", retry: "복구", manual: "수동", side: "부가" };
     const by = Object.entries(r.by).filter(([, v]) => v > 0).map(([k, v]) => `${KIND[k] || k} ${v}`).join("·");
-    if (el && known) el.textContent = `AI 오늘 ${n}/${g}회${n > g ? " (예비분 사용)" : ""}${by ? ` [${by}]` : ""} · 실행 ${runs}번 · 7일 ${r.week}회`;
+    if (el && known) el.textContent = `AI 오늘 ${n}/${g}회${n > g ? " (한도 초과)" : ""}${by ? ` [${by}]` : ""} · 실행 ${runs}번 · 7일 ${r.week}회`;
   });
   const known = rows.filter((r) => r.known);
   if (!known.length) return;
@@ -276,9 +286,16 @@ async function loadUsage() {
   const reserve = budget?.reserve ?? 0;
   const box = document.getElementById("usage");
   box.hidden = false;
-  box.innerHTML = `오늘 Gemini 사용 <b>${total}회</b> / 하루 예산 ${cap}회${reserve ? ` · 공유 예비분 ${Math.min(reserveUsed, reserve)}/${reserve}회 사용` : ""}
-    <div class="bar" aria-hidden="true"><i style="width:${Math.min(100, cap ? total / cap * 100 : 0).toFixed(0)}%"></i></div>
-    <small>${known.map((r) => `${esc(r.a.name)} ${r.n}/${r.g}`).join(" · ")} · 세 앱이 같은 Gemini 키를 나눠 써요. 하루는 오클랜드 00시에 새로 시작하고, 앱마다 보장량은 서로 뺏지 못합니다.</small>`;
+  // 앱별 한 줄: 오늘 사용 막대 + 최근 7일(막대 높이 = 그날 요청 수, 빈 칸 = 실행 기록 없음, 빨강 = 한도 초과)
+  const strip = (r) => `<span class="u7" role="img" aria-label="최근 7일 AI 요청 ${r.days7.map((x) => x.n).join(", ")}회">${r.days7.map((x) => {
+    const hgt = x.has ? Math.max(12, Math.min(100, r.g ? x.n / r.g * 100 : 0)) : 0;
+    return `<i class="${!x.has ? "no" : x.n > r.g ? "over" : ""}" title="${mdOf(x.dt)} · 요청 ${x.n}회 · 실행 ${x.runs}번" style="--h:${hgt.toFixed(0)}%"></i>`;
+  }).join("")}</span>`;
+  box.innerHTML = `오늘 Gemini 사용 <b>${total}회</b> / 하루 한도 합계 ${cap}회${reserve ? ` · 공유 예비분 ${Math.min(reserveUsed, reserve)}/${reserve}회 사용` : ""}
+    <div class="urows">${known.map((r) => `<div class="urow"><span class="un">${esc(r.a.name)}</span>
+      <span class="bar" aria-hidden="true"><i class="${r.n > r.g ? "over" : ""}" style="width:${Math.min(100, r.g ? r.n / r.g * 100 : 0).toFixed(0)}%"></i></span>
+      <span class="uv">${r.n}/${r.g}</span>${strip(r)}</div>`).join("")}</div>
+    <small>막대는 오늘 사용량, 오른쪽 7칸은 최근 7일 요청 수입니다. 앱마다 자기 Gemini 키를 쓰고 한도도 따로예요. 하루는 오클랜드 00시에 새로 시작합니다.</small>`;
 }
 loadUsage();
 

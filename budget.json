@@ -1,11 +1,23 @@
 {
-  "_설명": "세 앱이 같은 Gemini 키의 하루 몫을 나눠 쓰는 예산표. 하루 = 오클랜드(Pacific/Auckland) 00시 리셋. 숫자만 바꾸면 모든 앱이 다음 실행부터 따릅니다(합계 = 보장량 합 + reserve).",
+  "_설명": "앱별 하루 AI(Gemini) 요청 한도. 2026-11-14부터 앱마다 자기 Google 프로젝트의 키를 쓰므로 한도도 앱별로 따로입니다(공유 예비분 없음). 하루 = 오클랜드(Pacific/Auckland) 00시 리셋. 숫자만 바꾸면 각 앱이 다음 실행부터 따릅니다(합계 = 한도 합 + reserve).",
   "timezone": "Pacific/Auckland",
-  "total": 16,
-  "reserve": 3,
+  "total": 24,
+  "reserve": 0,
   "apps": {
-    "daily-brief":    { "name": "Daily Brief",     "guaranteed": 7, "usage": "/News_Summary/data/ai-usage.json" },
-    "whale-radar":    { "name": "웨일 레이더",     "guaranteed": 3, "usage": "/Whale_Radar/data/ai-usage.json" },
-    "robotics-radar": { "name": "로봇 레이더", "guaranteed": 3, "usage": "/Robotics_Radar/data/ai-usage.json" }
+    "daily-brief": {
+      "name": "Daily Brief",
+      "guaranteed": 12,
+      "usage": "/News_Summary/data/ai-usage.json"
+    },
+    "whale-radar": {
+      "name": "웨일 레이더",
+      "guaranteed": 6,
+      "usage": "/Whale_Radar/data/ai-usage.json"
+    },
+    "robotics-radar": {
+      "name": "로봇 레이더",
+      "guaranteed": 6,
+      "usage": "/Robotics_Radar/data/ai-usage.json"
+    }
   }
 }

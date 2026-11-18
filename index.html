@@ -179,6 +179,9 @@ const APPS = [
       const al = (d.new_alerts || [])[0];
       return [`NZD/KRW ${k.last.toFixed(2)}원 · 한국→NZ 송금 ${sg.to_nz} · NZ→한국 ${sg.to_kr}`, al ? `🔔 ${al}` : `${sg.text} · 기준일 ${k.date.slice(5).replace("-", "/")}`];
     } } },
+  { id: "english-trainer", name: "English Trainer", icon: "english-192.png", href: "https://english-trainer.gundog0109.workers.dev/",
+    desc: "NZ 구어체 스피킹 12문장·영작 10문장·기본동사·5형식 훈련, 틀린 문장 자동 복습. 내 코드로 어느 기기에서든 이어하기",
+    data: null, sched: { label: "내 코드로 이어하기 · 데이터 갱신 없음" } },
 ];
 
 // 개인 도구: Claude 비공개 페이지(본인 계정으로 로그인해야 열림). 허브는 페이지 내용을 읽을 수 없어서,

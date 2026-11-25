@@ -178,7 +178,11 @@ const APPS = [
       const k = d.pairs?.KRW, sg = d.signal;
       if (!k || !sg) return null;
       const al = (d.new_alerts || [])[0];
-      return [`NZD/KRW ${k.last.toFixed(2)}원 · 한국→NZ 송금 ${sg.to_nz} · NZ→한국 ${sg.to_kr}`, al ? `🔔 ${al}` : `${sg.text} · 기준일 ${k.date.slice(5).replace("-", "/")}`];
+      // FX Radar 화면에서 정한 내 목표 환율(같은 주소라 이 기기 저장소를 함께 씀)
+      let t = {}; try { t = JSON.parse(localStorage.getItem("fx.targets") || "{}") || {}; } catch { /* 무시 */ }
+      const hit = t.up && k.last >= t.up ? `🔔 목표 ${t.up}원 이상 도달 — NZD→KRW 보내기 좋은 때` : t.dn && k.last <= t.dn ? `🔔 목표 ${t.dn}원 이하 — KRW→NZD 보내기 좋은 때` : "";
+      const gap = [t.up ? `목표 ${t.up}원까지 ${(t.up - k.last).toFixed(1)}원` : "", t.dn ? `목표 ${t.dn}원까지 ${(k.last - t.dn).toFixed(1)}원` : ""].filter((x) => x && !hit).join(" · ");
+      return [`NZD/KRW ${k.last.toFixed(2)}원 · 한국→NZ 송금 ${sg.to_nz} · NZ→한국 ${sg.to_kr}`, hit || (al ? `🔔 ${al}` : `${sg.text}${gap ? " · " + gap : ""} · 기준일 ${k.date.slice(5).replace("-", "/")}`), "", hit ? `${hit} (지금 ${k.last.toFixed(2)}원)` : ""];
     } } },
   { id: "english-trainer", name: "English Trainer", icon: "english-192.png", href: "https://english-trainer.gundog0109.workers.dev/",
     desc: "NZ 구어체 스피킹 12문장·영작 10문장·기본동사·5형식 훈련, 틀린 문장 자동 복습. 내 코드로 어느 기기에서든 이어하기",
@@ -336,6 +340,7 @@ getJson("/News_Summary/data/status.json").then((st) => {
     const d = td.load ? await td.load() : await getJson(td.url);
     let t = null;
     try { t = d ? td.text(d) : null; } catch { t = null; }
+    if (t && t[3]) flag(`${a.id}-today`, a.name, t[3]);   // 4번째 값 = 상단 경고로도 띄울 문구(예: 목표 환율 도달)
     return t ? `<a href="${esc(a.href)}"${t[2] ? ` data-act="${esc(t[2])}"` : ""}><img src="${esc(a.icon)}" alt=""><span><b>${esc(t[0])}</b><small>${esc(a.name)} · ${esc(t[1])}</small></span></a>` : "";
   }));
   const box = document.getElementById("today3");

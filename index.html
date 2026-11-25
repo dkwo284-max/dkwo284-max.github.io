@@ -182,7 +182,20 @@ const APPS = [
     } } },
   { id: "english-trainer", name: "English Trainer", icon: "english-192.png", href: "https://english-trainer.gundog0109.workers.dev/",
     desc: "NZ 구어체 스피킹 12문장·영작 10문장·기본동사·5형식 훈련, 틀린 문장 자동 복습. 내 코드로 어느 기기에서든 이어하기",
-    data: null, sched: { label: "내 코드로 이어하기 · 데이터 갱신 없음" } },
+    data: null, sched: { label: "내 코드로 이어하기 · 데이터 갱신 없음" },
+    // 오늘 복습할 문장 수: English Trainer 의 /api/summary (숫자만, 허브 주소에서만 읽힘). 내 학습 코드는 이 기기에만 저장
+    today: { load: async () => {
+      let code = ""; try { code = localStorage.getItem("hub.etcode") || ""; } catch { /* 무시 */ }
+      if (!code) return { needCode: true };
+      try { const r = await fetch("https://english-trainer.gundog0109.workers.dev/api/summary", { headers: { "x-code": code }, cache: "no-store" }); return r.ok ? await r.json() : { err: (await r.json().catch(() => ({}))).error || r.status }; }
+      catch { return null; }
+    }, text: (d) => {
+      if (d.needCode) return ["English Trainer 학습 코드 연결하기", "한 번 넣으면 오늘 복습할 문장 수가 여기에 떠요 (이 기기에만 저장)", "etcode"];
+      if (d.err) return ["English Trainer 코드를 확인해 주세요", `${d.err} · 눌러서 다시 입력`, "etcode"];
+      const left = d.due, more = d.dueAll - d.due;
+      return [left ? `영어 복습 ${left}문장 남음${d.reviewedToday ? ` (오늘 ${d.reviewedToday}문장 함)` : ""}` : d.reviewedToday ? `오늘 영어 복습 끝 ✓ (${d.reviewedToday}문장)` : "오늘 영어 복습할 문장 없음 ✓",
+        `🔥 ${d.streak}일 연속${more > 0 ? ` · 내일 이후로 ${more}문장` : ""} · 스피킹 ${d.speakToday} · 독백 ${d.monoToday}`];
+    } } },
 ];
 
 // 개인 도구: Claude 비공개 페이지(본인 계정으로 로그인해야 열림). 허브는 페이지 내용을 읽을 수 없어서,
@@ -320,14 +333,24 @@ getJson("/News_Summary/data/status.json").then((st) => {
 // 오늘 볼 것 3줄: 각 앱이 이미 만들어 둔 데이터에서 결론 한 줄씩 (AI 요청 없음)
 (async () => {
   const lines = await Promise.all(APPS.flatMap((a) => [a.today, a.today2].filter(Boolean).map((td) => ({ a, td }))).map(async ({ a, td }) => {
-    const d = await getJson(td.url);
+    const d = td.load ? await td.load() : await getJson(td.url);
     let t = null;
     try { t = d ? td.text(d) : null; } catch { t = null; }
-    return t ? `<a href="${esc(a.href)}"><img src="${esc(a.icon)}" alt=""><span><b>${esc(t[0])}</b><small>${esc(a.name)} · ${esc(t[1])}</small></span></a>` : "";
+    return t ? `<a href="${esc(a.href)}"${t[2] ? ` data-act="${esc(t[2])}"` : ""}><img src="${esc(a.icon)}" alt=""><span><b>${esc(t[0])}</b><small>${esc(a.name)} · ${esc(t[1])}</small></span></a>` : "";
   }));
   const box = document.getElementById("today3");
   if (lines.some(Boolean)) { box.hidden = false; box.innerHTML = `<h2>오늘 볼 것</h2>${lines.join("")}`; }
 })();
+
+document.addEventListener("click", (e) => {   // '오늘 볼 것'의 English Trainer 코드 연결
+  const a = e.target.closest?.('[data-act="etcode"]');
+  if (!a) return;
+  e.preventDefault();
+  const c = prompt("English Trainer 학습 코드 (앱에 로그인할 때 쓰는 코드)");
+  if (c == null) return;
+  try { if (c.trim()) localStorage.setItem("hub.etcode", c.trim()); else localStorage.removeItem("hub.etcode"); } catch { /* 무시 */ }
+  location.reload();
+});
 
 // 상단 경고: 오늘 갱신이 안 됐거나 일부 실패한 앱·도구를 한 줄씩 모아 보여 줌
 // 상단 갱신 현황판: 앱마다 상태 점(초록 갱신됨·노랑 대기/부분·빨강 안 됨·점선 확인 불가·빈 원 수동), 주기, 마지막 갱신, 다음 예정

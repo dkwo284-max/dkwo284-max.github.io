@@ -145,6 +145,25 @@ const APPS = [
       const top = (now.portfolios[pick] || []).slice(0, 4).map((h) => h.t).join(" · ");
       return [`추천 조합: ${d.labels[pick]} (${top})`, `5년 연 ${pc(m.cagr)} · S&P500 ${pc(m.spy_cagr)} · 다음 재조정 ${now.next.slice(5).replace("-", "/")} 무렵${(ch.in || []).length ? ` · 지난 재조정에서 ${ch.in.length}종목 편입` : ""}`];
     } },
+    // 관심 종목(웨일 레이더 '관심' 탭, 같은 주소라 이 기기 저장소를 함께 씀)의 이번 분기 대가 매수·매도 + 최근 3일 새 13F 도착 알림
+    today3: { url: "/Whale_Radar/data/dashboard.json", text: (d) => {
+      let w = {}; try { w = JSON.parse(localStorage.getItem("radar.watch") || "{}") || {}; } catch { /* 무시 */ }
+      const tks = (w.terms || []).filter((t) => /^[A-Z][A-Z0-9.\-]{0,6}$/.test(t));
+      const se = d.season || {}, recent = (se.arrived || []).filter((a) => (Date.now() - Date.parse(a.filed)) / 864e5 <= 3);
+      const nm = Object.fromEntries((d.investors || []).map((i) => [i.id, i.name]));
+      const moves = tks.map((t) => {
+        const hs = (d.investors || []).filter((i) => !i.stale).flatMap((i) => (i.positions || []).filter((p) => p.ticker === t).map((p) => ({ i, p })));
+        const b = hs.filter((h) => h.p.signal === "BUY"), s = hs.filter((h) => h.p.signal === "SELL");
+        const fresh = hs.filter((h) => (h.p.signal === "BUY" || h.p.signal === "SELL") && recent.some((a) => a.id === h.i.id));
+        return { t, b, s, fresh };
+      }).filter((m) => m.b.length || m.s.length);
+      const fresh = moves.filter((m) => m.fresh.length);
+      const flagTxt = fresh.length ? `새 13F 에서 관심 종목 움직임: ${fresh.map((m) => `${m.t} ${m.fresh.map((h) => `${h.i.name} ${h.p.label}`).join(", ")}`).join(" / ")}` : "";
+      if (moves.length) return [`관심 종목 대가 움직임: ${moves.slice(0, 4).map((m) => `${m.t} 매수 ${m.b.length}·매도 ${m.s.length}`).join(" · ")}`,
+        recent.length ? `최근 3일 새 13F ${recent.length}명 (${recent.slice(0, 3).map((a) => nm[a.id] || a.id).join(", ")}${recent.length > 3 ? " 외" : ""})` : `${(se.period || "").slice(0, 7)} 분기 13F 기준`, "", flagTxt];
+      if (recent.length) return [`새 13F ${recent.length}명 도착: ${recent.slice(0, 4).map((a) => nm[a.id] || a.id).join(", ")}${recent.length > 4 ? " 외" : ""}`, tks.length ? "관심 종목에는 이번 분기 움직임 없음" : "웨일 레이더 '관심' 탭에 종목을 넣으면 그 종목 움직임만 골라 보여 줘요"];
+      return null;
+    } },
     // 대가들이 새로 편입한 종목 조합의 실제 성적(추적 시작일부터) — 웨일 레이더 '신규 편입' 화면과 같은 값
     today2: { url: "/Whale_Radar/data/strategy.json", text: (d) => {
       const nb = d.newbuys, lv = nb?.live, combo = nb?.now?.combo || [];
@@ -336,7 +355,7 @@ getJson("/News_Summary/data/status.json").then((st) => {
 
 // 오늘 볼 것 3줄: 각 앱이 이미 만들어 둔 데이터에서 결론 한 줄씩 (AI 요청 없음)
 (async () => {
-  const lines = await Promise.all(APPS.flatMap((a) => [a.today, a.today2].filter(Boolean).map((td) => ({ a, td }))).map(async ({ a, td }) => {
+  const lines = await Promise.all(APPS.flatMap((a) => [a.today, a.today2, a.today3].filter(Boolean).map((td) => ({ a, td }))).map(async ({ a, td }) => {
     const d = td.load ? await td.load() : await getJson(td.url);
     let t = null;
     try { t = d ? td.text(d) : null; } catch { t = null; }

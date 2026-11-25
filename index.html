@@ -122,9 +122,10 @@ footer a { color: var(--accent); }
 const APPS = [
   { id: "daily-brief", name: "Daily Brief", icon: "brief-192.png", href: "/News_Summary/",
     desc: "오클랜드·뉴질랜드·한국 아침 뉴스 요약, 이민 레이더, 동네·치안 지도",
-    data: "/News_Summary/data/latest.json", time: (d) => d.generated_at, ready: "07:00", sched: { at: "06:00" },
+    data: "/News_Summary/data/latest.json", time: (d) => d.generated_at, ready: "07:00", sched: { at: "03:00" }, repo: "dkwo284-max/News_Summary",
     // 자동 재시도 시각(UTC, daily.yml 의 cron): 일부 실패면 다음 재시도 시각을 보여 줌
-    retries: ["17:25", "17:45", "18:15", "18:25", "18:45", "19:15", "21:10", "01:10"],
+    // 새벽 복구(03:25~06:55 NZDT = 14:25~17:55 UTC, 30분 간격) + 늦은 안전망(현지 11~14시 = 22~01 UTC)
+    retries: ["14:25", "14:55", "15:25", "15:55", "16:25", "16:55", "17:25", "17:55", "22:00", "23:00", "00:00", "01:00"],
     problem: (d) => (d.meta?.degraded ? `요약 일부 실패${d.meta.degraded_reason ? "(" + d.meta.degraded_reason + ")" : ""}` : ""), usage: "/News_Summary/data/ai-usage.json",
     today: { url: "/News_Summary/data/latest.json", text: (d) => {
       const all = Object.entries(d.sections || {}).filter(([k]) => k !== "kr_politics").flatMap(([, s]) => s.items || []).filter((i) => !i.carried_from);
@@ -136,7 +137,7 @@ const APPS = [
     } } },
   { id: "whale-radar", name: "웨일 레이더", icon: "whale-192.png", href: "/Whale_Radar/",
     desc: "버핏·애크먼 등 거물 투자자의 SEC 공시와 인터뷰·뉴스를 한국어로",
-    data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at), ready: "18:00", sched: { at: "03:37", utc: true }, usage: "/Whale_Radar/data/ai-usage.json",
+    data: "/Whale_Radar/data/dashboard.json", time: (d) => (d.demo ? null : d.generated_at), ready: "18:00", sched: { at: "03:37", utc: true }, usage: "/Whale_Radar/data/ai-usage.json", repo: "dkwo284-max/Whale_Radar",
     today: { url: "/Whale_Radar/data/strategy.json", text: (d) => {
       const f = d.bases?.follow, pick = d.recommend?.pick;
       if (!f || !pick) return null;
@@ -155,7 +156,7 @@ const APPS = [
     } } },
   { id: "robotics-radar", name: "로봇 레이더", icon: "robot-192.png", href: "/Robotics_Radar/",
     desc: "휴머노이드·피지컬 AI 기업의 양산·자금·IPO·부품 기회를 부품사·투자 관점으로",
-    data: "/Robotics_Radar/data/dashboard.json", time: (d) => d.generated_at, ready: "09:30", sched: { at: "19:10", utc: true }, usage: "/Robotics_Radar/data/ai-usage.json",
+    data: "/Robotics_Radar/data/dashboard.json", time: (d) => d.generated_at, ready: "09:30", sched: { at: "19:10", utc: true }, usage: "/Robotics_Radar/data/ai-usage.json", repo: "dkwo284-max/Robotics_Radar",
     today: { url: "/Robotics_Radar/data/dashboard.json", text: (d) => {
       const since = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
       const news = (d.news || []).filter((x) => x.date >= since).sort((a, b) => (b.importance || 0) - (a.importance || 0) || (b.n_src || 1) - (a.n_src || 1) || b.date.localeCompare(a.date));
@@ -166,13 +167,13 @@ const APPS = [
     } } },
   { id: "leisure", name: "주말 나들이", icon: "leisure-192.png", href: "/News_Summary/leisure.html",
     desc: "오클랜드 가족 나들이: 주말 코스, 지금 영업 중, 요금·운영 시간, 지도, 회원권 비교",
-    data: "/News_Summary/data/leisure.json", time: (d) => d.updated_at, ready: "12:00", sched: { at: "21:47", utc: true } },
+    data: "/News_Summary/data/leisure.json", time: (d) => d.updated_at, ready: "12:00", sched: { at: "21:47", utc: true }, repo: "dkwo284-max/News_Summary", workflow: "leisure.yml" },
   { id: "nz-drive", name: "NZ Drive · 운전 연습", icon: "drive-192.png", href: "/NZ-Drive/",
     desc: "한국 운전자용 NZ 운전 연습: 도심·고속도로·지방·주차 28코스, 크루즈, 이론 모의고사·위험 인지·모의 실기, 면허 전환 안내",
     data: null, sched: { label: "게임 · 데이터 갱신 없음" } },
   { id: "fx-radar", name: "FX Radar", icon: "fx-192.png", href: "/FX_Radar/",
     desc: "NZD/KRW 환율 추이, 1년 중 위치, 송금 방향별 유리·불리, 업체 견적 비교",
-    data: "/FX_Radar/data/fx.json", time: (d) => d.generated_at, usage: null, ready: "07:00", sched: { at: "16:37", utc: true },
+    data: "/FX_Radar/data/fx.json", time: (d) => d.generated_at, usage: null, ready: "07:00", sched: { at: "16:37", utc: true }, repo: "dkwo284-max/FX_Radar",
     today: { url: "/FX_Radar/data/fx.json", text: (d) => {
       const k = d.pairs?.KRW, sg = d.signal;
       if (!k || !sg) return null;
@@ -275,6 +276,9 @@ async function loadUsage() {
     const days7 = [...Array(7)].map((_, k) => { const dt = new Date(Date.parse(day) - (6 - k) * 864e5).toISOString().slice(0, 10), x = u?.days?.[dt]; return { dt, n: x?.requests ?? 0, runs: x?.runs ?? 0, has: !!x }; });
     return { a, known: !!u, days7, n: d?.requests ?? 0, runs: d?.runs ?? 0, g, by: d?.by || {}, week: Object.entries(u?.days || {}).sort().slice(-7).reduce((s, [, x]) => s + (x.requests || 0), 0) };
   }));
+  rows.forEach(({ a, known, n, g }) => {   // 하루 한도의 80% 이상 쓰면 상단 경고 (다음 실행·복구가 AI 없이 나갈 수 있음)
+    if (known && g && n >= Math.ceil(g * 0.8)) flag(`ai-${a.id}`, a.name, `오늘 AI ${n}/${g}회 사용${n >= g ? " — 한도를 다 써서 남은 실행은 AI 없이(원문·규칙) 진행" : " — 한도에 거의 닿음"}`);
+  });
   rows.forEach(({ a, known, n, runs, g }) => {
     const i = APPS.indexOf(a), el = document.querySelector(`#app-${i} [data-ai]`);
     const r = rows.find((x) => x.a === a), KIND = { scheduled: "정기", retry: "복구", manual: "수동", side: "부가" };
@@ -385,11 +389,40 @@ document.addEventListener("click", (e) => {  // 현황판 줄을 누르면 해�
   card.animate?.([{ boxShadow: "0 0 0 3px var(--accent)" }, { boxShadow: "none" }], { duration: 1400 });
 });
 const problems = new Map();
-function flag(key, name, text) {
-  if (text) problems.set(key, `${name}: ${text}`); else problems.delete(key);
+function flag(key, name, text, link) {
+  if (text) problems.set(key, { t: `${name}: ${text}`, link: link || problems.get(key)?.link }); else problems.delete(key);
   const box = document.getElementById("alertbar");
   box.hidden = !problems.size;
-  box.innerHTML = problems.size ? `<b>⚠️ 확인이 필요한 앱 ${problems.size}개</b>${[...problems.values()].map(esc).join("<br>")}` : "";
+  box.innerHTML = problems.size ? `<b>⚠️ 확인이 필요한 앱 ${problems.size}개</b>${[...problems.values()].map((p) => esc(p.t) + (p.link ? ` <a href="${esc(p.link)}" target="_blank" rel="noopener">실행 기록 ↗</a>` : "")).join("<br>")}` : "";
+}
+// 갱신이 안 됐거나 일부 실패한 앱: GitHub 공개 API 로 최근 자동 실행을 보고 '어디서 실패했나'를 한 줄로 (로그인 없이, 문제 있는 앱만 조회)
+async function whyFailed(a) {
+  if (!a.repo) return null;
+  const runs = await getJson(`https://api.github.com/repos/${a.repo}/actions/runs?per_page=15&exclude_pull_requests=true`);
+  const list = (runs?.workflow_runs || []).filter((r) => !a.workflow || r.path?.endsWith("/" + a.workflow));
+  const done = list.filter((r) => r.status === "completed");
+  const live = list.find((r) => r.status === "in_progress" || r.status === "queued");
+  const fail = done.find((r) => r.conclusion === "failure");
+  const lastOk = done.find((r) => r.conclusion === "success");
+  if (!fail || (lastOk && lastOk.created_at > fail.created_at)) return live ? { text: `지금 실행 중 (${live.name})`, link: live.html_url } : null;
+  let step = "";
+  const jobs = await getJson(fail.jobs_url);
+  for (const j of jobs?.jobs || []) {
+    const st = (j.steps || []).find((x) => x.conclusion === "failure");
+    if (j.conclusion === "failure") { step = `${j.name}${st ? " › " + st.name : ""}`; break; }
+  }
+  const deploy = /deploy|pages|배포/i.test(step);
+  const when = `${mdOf(nzDateOf(fail.created_at))} ${new Date(fail.created_at).toLocaleTimeString("en-GB", { timeZone: "Pacific/Auckland", hour: "2-digit", minute: "2-digit", hour12: false })}`;
+  const why = deploy ? "사이트 배포 단계 실패(GitHub 일시 오류일 때가 많아 다음 실행에서 보통 해결)" : `${step || fail.name} 단계 실패`;
+  return { text: `${when} ${fail.name}: ${why}${live ? " · 지금 다시 실행 중" : ""}`, link: fail.html_url };
+}
+async function explain(a, i) {
+  const w = await whyFailed(a).catch(() => null);
+  if (!w) return;
+  const meta = document.querySelector(`#app-${i} [data-meta]`);
+  if (meta) meta.textContent += ` · 원인: ${w.text}`;
+  const cur = problems.get(a.id);
+  if (cur) flag(a.id, a.name, cur.t.slice(a.name.length + 2) + ` — ${w.text}`, w.link);
 }
 const nzHM = () => new Date().toLocaleTimeString("en-GB", { timeZone: "Pacific/Auckland", hour: "2-digit", minute: "2-digit", hour12: false });
 const nzDateOf = (iso) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Pacific/Auckland" });
@@ -469,12 +502,14 @@ APPS.forEach(async (a, i) => {
       meta.textContent = `마지막 업데이트 ${mdOf(upd)} · ${rel(t)}`;
       flag(a.id, a.name, `오늘 갱신 안 됨 (마지막 ${mdOf(upd)})`);
       bset(a.id, { cls: "bad", text: "오늘 갱신 안 됨", last: lastTxt });
+      explain(a, i);
     } else if (prob) {
       const nx = nextRetry(a.retries);
       st.textContent = "일부 실패 · 복구 중"; st.className = "status wait"; meta.classList.add("bad");
       meta.textContent = `${prob} · ${nx ? `다음 자동 재시도 ${nx}` : "오늘 자동 재시도 끝남"} · 업데이트 ${rel(t)}`;
       flag(a.id, a.name, `${prob} — ${nx ? `${nx} 자동 재시도` : "자동 재시도 끝남, 수동 확인 필요"}`);
       bset(a.id, { cls: "wait", text: "일부 실패", last: lastTxt });
+      explain(a, i);
     } else {
       st.textContent = upd === day ? "오늘 갱신됨" : "갱신 대기"; st.className = `status ${upd === day ? "ok" : "wait"}`;
       bset(a.id, { cls: upd === day ? "ok" : "wait", text: upd === day ? "" : "갱신 대기", last: lastTxt });
